@@ -1,11 +1,12 @@
 const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { createCanvas } = require('@napi-rs/canvas');
-const { execFile } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { execFile, spawn } = require('node:child_process');
+const { createHash, randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { migrateStore, readStore, writeStore } = require('./store.cjs');
+const { isNewerVersion } = require('./update.cjs');
 
 const appDataRoot = app.getPath('appData');
 app.setName('招迹');
@@ -23,6 +24,47 @@ app.on('second-instance', () => {
 const dataFile = () => path.join(app.getPath('userData'), 'data.json');
 ipcMain.handle('data:load', () => readStore(dataFile()));
 ipcMain.handle('data:save', (_event, patch) => writeStore(dataFile(), patch));
+
+async function latestRelease() {
+  const response = await fetch('https://api.github.com/repos/wuzenghui27-wq/campus-flow/releases/latest', { headers:{ Accept:'application/vnd.github+json', 'User-Agent':'招迹' } });
+  if (!response.ok) throw new Error(`GitHub ${response.status}`);
+  const release = await response.json();
+  return { ...release, version:String(release.tag_name).replace(/^v/,'') };
+}
+
+ipcMain.handle('update:check', async () => {
+  try { const release = await latestRelease(); return { available:isNewerVersion(release.version, app.getVersion()), version:release.version }; }
+  catch { return { available:false, version:'' }; }
+});
+
+ipcMain.handle('update:install', async () => {
+  try {
+    const release = await latestRelease();
+    if (!isNewerVersion(release.version, app.getVersion())) return false;
+    if (!process.env.PORTABLE_EXECUTABLE_FILE) {
+      autoUpdater.autoDownload = false;
+      const result = await autoUpdater.checkForUpdates();
+      if (!result?.updateInfo || !isNewerVersion(result.updateInfo.version, app.getVersion())) return false;
+      autoUpdater.once('update-downloaded', () => autoUpdater.quitAndInstall(false, true));
+      await autoUpdater.downloadUpdate();
+      return true;
+    }
+    const asset = release.assets.find(item => item.name === `campus-flow-${release.version}-portable.exe`);
+    if (!asset || asset.size > 200 * 1024 * 1024) return false;
+    const response = await fetch(asset.browser_download_url);
+    if (!response.ok) return false;
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.length !== asset.size) return false;
+    if (asset.digest?.startsWith('sha256:') && createHash('sha256').update(data).digest('hex') !== asset.digest.slice(7)) return false;
+    const source = path.join(app.getPath('temp'), `招迹-${release.version}-${randomUUID()}.exe`);
+    const target = path.resolve(process.env.PORTABLE_EXECUTABLE_FILE);
+    await fs.writeFile(source, data);
+    const script = app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'update.ps1') : path.join(__dirname, 'update.ps1');
+    spawn('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-Source',source,'-Target',target,'-RunningId',String(process.pid)], { detached:true, stdio:'ignore', windowsHide:true }).unref();
+    setImmediate(() => app.quit());
+    return true;
+  } catch { return false; }
+});
 
 async function recognizeImage(filePath) {
   const script = app.isPackaged
@@ -116,11 +158,6 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     callback({ cancel:!(host === 'github.com' || host.endsWith('.github.com') || host.endsWith('.githubusercontent.com')) });
   });
   createWindow();
-  if (app.isPackaged && !process.env.PORTABLE_EXECUTABLE_FILE) {
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 3000);
-  }
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

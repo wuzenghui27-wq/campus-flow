@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test tests/model.test.ts tests/store.test.cjs",
+    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs",
     "desktop": "electron .",
     "dist:win": "npm run test && npm run build && electron-builder --win portable --x64"
   },
@@ -36,7 +36,8 @@
     "productName": "招迹",
     "asar": true,
     "asarUnpack": [
-      "electron/ocr.ps1"
+      "electron/ocr.ps1",
+      "electron/update.ps1"
     ],
     "directories": {
       "output": "release",

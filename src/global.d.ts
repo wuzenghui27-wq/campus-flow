@@ -7,6 +7,8 @@ declare global {
     campus?: {
       loadData(): Promise<LocalData | null>;
       saveData(patch: LocalData): Promise<void>;
+      checkUpdate(): Promise<{ available:boolean; version:string }>;
+      installUpdate(): Promise<boolean>;
       pickResume(): Promise<ResumeRecord | null>;
       openResume(path: string): Promise<boolean>;
       extractResume(path: string): Promise<string | null>;

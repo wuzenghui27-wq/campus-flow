@@ -1,5 +1,5 @@
 import {
-  BarChart3, BriefcaseBusiness, Building2, ExternalLink, FileText, FolderOpen, LayoutDashboard, LockKeyhole,
+  BarChart3, BriefcaseBusiness, Building2, Download, ExternalLink, FileText, FolderOpen, LayoutDashboard, LockKeyhole,
   Pencil, Plus, Sparkles, Trash2, UserRound, X,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
@@ -94,7 +94,10 @@ export default function App() {
   const [profile,setProfileState]=useState(()=>parseProfile(localStorage.getItem('campus-flow-profile')));
   const [resume,setResumeState]=useState<ResumeRecord|null>(()=>parseObject(localStorage.getItem('campus-flow-resume'),null as unknown as ResumeRecord));
   const [editing,setEditing]=useState<Application|null|undefined>();
+  const [updateVersion,setUpdateVersion]=useState('');
+  const [updating,setUpdating]=useState(false);
   useEffect(()=>{ window.campus?.loadData().then(data=>{ if(data){ if(data.applications)setAppsState(parseApplications(JSON.stringify(data.applications))); if(data.profile)setProfileState(parseProfile(JSON.stringify(data.profile))); if(data.resume)setResumeState(parseObject(JSON.stringify(data.resume),null as unknown as ResumeRecord)) } else window.campus?.saveData({applications:apps,profile,resume}) }) },[]);
+  useEffect(()=>{ window.campus?.checkUpdate().then(info=>{if(info.available)setUpdateVersion(info.version)}) },[]);
   const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); localStorage.setItem('campus-flow-applications',JSON.stringify(sorted)); window.campus?.saveData({applications:sorted}) };
   const setProfile=(next:Profile)=>{ setProfileState(next); localStorage.setItem('campus-flow-profile',JSON.stringify(next)); window.campus?.saveData({profile:next}) };
   const setResume=(next:ResumeRecord)=>{ setResumeState(next); localStorage.setItem('campus-flow-resume',JSON.stringify(next)); window.campus?.saveData({resume:next}) };
@@ -102,6 +105,7 @@ export default function App() {
   const remove=(id:string)=>{ if(confirm('确定删除这条投递记录吗？'))setApps(apps.filter(app=>app.id!==id)) };
   const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
   const importProfile=(fields:Partial<Profile>)=>{ setProfile({...profile,...fields}); setPage('个人信息') };
+  const installUpdate=async()=>{ setUpdating(true); if(!await window.campus?.installUpdate()){setUpdating(false);alert('更新失败，请稍后重试。')} };
   const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
-  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
+  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav>{updateVersion&&<button className="update-button" onClick={installUpdate} disabled={updating}><Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}<div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
 }
