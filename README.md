@@ -4,8 +4,8 @@
 
 ## 下载
 
-- `校招迹-自动更新版-*-安装.exe`：推荐使用，安装后从 GitHub Releases 自动更新。
-- `校招迹-*-portable.exe`：无需安装的便携版，需手动下载新版本替换。
+- `campus-flow-setup-*.exe`：推荐使用，安装后从 GitHub Releases 自动更新。
+- `campus-flow-*-portable.exe`：无需安装的便携版，需手动下载新版本替换。
 
 ## 发布新版本
 

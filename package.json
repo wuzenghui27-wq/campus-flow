@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -57,10 +57,10 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "artifactName": "校招迹-自动更新版-${version}-安装.exe"
+      "artifactName": "campus-flow-setup-${version}.exe"
     },
     "portable": {
-      "artifactName": "校招迹-${version}-portable.exe"
+      "artifactName": "campus-flow-${version}-portable.exe"
     },
     "publish": [
       {
