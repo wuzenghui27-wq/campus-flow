@@ -1,8 +1,12 @@
-import type { ResumeRecord } from './model';
+import type { Application, Profile, ResumeRecord } from './model';
+
+type LocalData = { applications?:Application[]; profile?:Profile; resume?:ResumeRecord|null };
 
 declare global {
   interface Window {
     campus?: {
+      loadData(): Promise<LocalData | null>;
+      saveData(patch: LocalData): Promise<void>;
       pickResume(): Promise<ResumeRecord | null>;
       openResume(path: string): Promise<boolean>;
       extractResume(path: string): Promise<string | null>;

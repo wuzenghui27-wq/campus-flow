@@ -5,6 +5,7 @@ const { execFile } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { readStore, writeStore } = require('./store.cjs');
 
 app.setName('校招迹');
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -16,6 +17,10 @@ app.on('second-instance', () => {
   win?.show();
   win?.focus();
 });
+
+const dataFile = () => path.join(app.getPath('userData'), 'data.json');
+ipcMain.handle('data:load', () => readStore(dataFile()));
+ipcMain.handle('data:save', (_event, patch) => writeStore(dataFile(), patch));
 
 async function recognizeImage(filePath) {
   const script = app.isPackaged

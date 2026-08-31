@@ -2,7 +2,7 @@ import {
   BarChart3, BriefcaseBusiness, Building2, FileText, FolderOpen, LayoutDashboard, LockKeyhole,
   Pencil, Plus, Sparkles, Trash2, UserRound, X,
 } from 'lucide-react';
-import { FormEvent, ReactNode, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Application, extractProfile, parseApplications, parseObject, Profile, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
 
 type Page = '工作台' | '投递记录' | '数据统计' | '简历' | '个人信息' | '已投递公司统计';
@@ -94,9 +94,10 @@ export default function App() {
   const [profile,setProfileState]=useState(()=>parseObject(localStorage.getItem('campus-flow-profile'),emptyProfile));
   const [resume,setResumeState]=useState<ResumeRecord|null>(()=>parseObject(localStorage.getItem('campus-flow-resume'),null as unknown as ResumeRecord));
   const [editing,setEditing]=useState<Application|null|undefined>();
-  const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); localStorage.setItem('campus-flow-applications',JSON.stringify(sorted)) };
-  const setProfile=(next:Profile)=>{ setProfileState(next); localStorage.setItem('campus-flow-profile',JSON.stringify(next)) };
-  const setResume=(next:ResumeRecord)=>{ setResumeState(next); localStorage.setItem('campus-flow-resume',JSON.stringify(next)) };
+  useEffect(()=>{ window.campus?.loadData().then(data=>{ if(data){ if(data.applications)setAppsState(parseApplications(JSON.stringify(data.applications))); if(data.profile)setProfileState(parseObject(JSON.stringify(data.profile),emptyProfile)); if(data.resume)setResumeState(parseObject(JSON.stringify(data.resume),null as unknown as ResumeRecord)) } else window.campus?.saveData({applications:apps,profile,resume}) }) },[]);
+  const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); localStorage.setItem('campus-flow-applications',JSON.stringify(sorted)); window.campus?.saveData({applications:sorted}) };
+  const setProfile=(next:Profile)=>{ setProfileState(next); localStorage.setItem('campus-flow-profile',JSON.stringify(next)); window.campus?.saveData({profile:next}) };
+  const setResume=(next:ResumeRecord)=>{ setResumeState(next); localStorage.setItem('campus-flow-resume',JSON.stringify(next)); window.campus?.saveData({resume:next}) };
   const save=(app:Application)=>{ setApps(apps.some(item=>item.id===app.id)?apps.map(item=>item.id===app.id?app:item):[app,...apps]); setEditing(undefined) };
   const remove=(id:string)=>{ if(confirm('确定删除这条投递记录吗？'))setApps(apps.filter(app=>app.id!==id)) };
   const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
