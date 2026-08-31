@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const path = require('node:path');
 
 async function readStore(filePath) {
   try {
@@ -14,4 +15,13 @@ async function writeStore(filePath, patch) {
   await fs.writeFile(filePath, json, 'utf8');
 }
 
-module.exports = { readStore, writeStore };
+async function migrateStore(fromPath, toPath) {
+  if (await readStore(toPath)) return false;
+  const legacy = await readStore(fromPath);
+  if (!legacy) return false;
+  await fs.mkdir(path.dirname(toPath), { recursive:true });
+  await writeStore(toPath, legacy);
+  return true;
+}
+
+module.exports = { migrateStore, readStore, writeStore };

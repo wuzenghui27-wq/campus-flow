@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -33,7 +33,7 @@
   },
   "build": {
     "appId": "cn.campusflow.desktop",
-    "productName": "校招迹",
+    "productName": "招迹",
     "asar": true,
     "asarUnpack": [
       "electron/ocr.ps1"

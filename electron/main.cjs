@@ -5,9 +5,11 @@ const { execFile } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { readStore, writeStore } = require('./store.cjs');
+const { migrateStore, readStore, writeStore } = require('./store.cjs');
 
-app.setName('校招迹');
+const appDataRoot = app.getPath('appData');
+app.setName('招迹');
+app.setPath('userData', path.join(appDataRoot, '招迹'));
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
 
@@ -107,7 +109,8 @@ ipcMain.on('window:minimize', event => BrowserWindow.fromWebContents(event.sende
 ipcMain.on('window:toggle-maximize', event => { const win = BrowserWindow.fromWebContents(event.sender); if (win?.isMaximized()) win.unmaximize(); else win?.maximize(); });
 ipcMain.on('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close());
 
-if (hasSingleInstanceLock) app.whenReady().then(() => {
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
+  await migrateStore(path.join(appDataRoot, '校招迹', 'data.json'), dataFile()).catch(() => {});
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, ({ url }, callback) => {
     const host = new URL(url).hostname;
     callback({ cancel:!(host === 'github.com' || host.endsWith('.github.com') || host.endsWith('.githubusercontent.com')) });

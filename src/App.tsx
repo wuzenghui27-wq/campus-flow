@@ -85,7 +85,7 @@ function ApplicationModal({ app, close, save }:{ app:Application|null; close:()=
 }
 
 function TitleBar() {
-  return <div className="title-bar"><span className="title-dot"/><span>校招迹</span><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
+  return <div className="title-bar"><span className="title-dot"/><span>招迹</span><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
 }
 
 export default function App() {
@@ -103,5 +103,5 @@ export default function App() {
   const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
   const importProfile=(fields:Partial<Profile>)=>{ setProfile({...profile,...fields}); setPage('个人信息') };
   const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
-  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>校招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
+  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
 }
