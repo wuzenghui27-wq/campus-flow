@@ -95,7 +95,10 @@ function createWindow() {
     frame: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    try { const target = new URL(url); if (['http:','https:'].includes(target.protocol)) shell.openExternal(target.toString()); } catch {}
+    return { action:'deny' };
+  });
   win.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file:')) event.preventDefault(); });
   win.loadFile(path.join(__dirname, '../dist/index.html'));
 }
