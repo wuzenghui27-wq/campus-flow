@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('campus', {
   loadData: () => ipcRenderer.invoke('data:load'),
+  recoverData: () => ipcRenderer.invoke('data:recover'),
   saveData: (patch) => ipcRenderer.invoke('data:save', patch),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

@@ -6,6 +6,7 @@ declare global {
   interface Window {
     campus?: {
       loadData(): Promise<LocalData | null>;
+      recoverData(): Promise<LocalData | null>;
       saveData(patch: LocalData): Promise<void>;
       checkUpdate(): Promise<{ available:boolean; version:string }>;
       installUpdate(): Promise<boolean>;
