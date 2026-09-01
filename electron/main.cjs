@@ -5,7 +5,7 @@ const { execFile, spawn } = require('node:child_process');
 const { createHash, randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { migrateStore, readStore, recoverStore, writeStore } = require('./store.cjs');
+const { flushWrites, loadStore, recoverStore, writeStore } = require('./store.cjs');
 const { isNewerVersion } = require('./update.cjs');
 
 const appDataRoot = process.env.APPDATA || app.getPath('appData');
@@ -23,9 +23,26 @@ app.on('second-instance', () => {
 
 const dataFile = path.join(appDataRoot, '招迹', 'data.json');
 const legacyDataFile = path.join(appDataRoot, '校招迹', 'data.json');
-ipcMain.handle('data:load', () => readStore(dataFile));
-ipcMain.handle('data:recover', () => recoverStore(dataFile, [legacyDataFile]));
-ipcMain.handle('data:save', (_event, patch) => writeStore(dataFile, patch));
+let storeState = { status:'error', source:'none', data:null };
+let dataWrites = Promise.resolve();
+ipcMain.on('data:initial', event => { event.returnValue = storeState; });
+ipcMain.handle('data:retry', async () => { await dataWrites; return storeState = await loadStore(dataFile, [legacyDataFile]); });
+ipcMain.handle('data:recover', async () => {
+  await dataWrites;
+  const data = await recoverStore(dataFile, [legacyDataFile]);
+  return storeState = data ? { status:'loaded', source:'recovery', data } : await loadStore(dataFile, [legacyDataFile]);
+});
+ipcMain.handle('data:save', async (_event, patch) => {
+  const result = dataWrites.then(async () => {
+    if (storeState.status === 'error') throw new Error('Local data is unavailable');
+    const data = await writeStore(dataFile, patch, storeState.data ?? {});
+    storeState = { status:'loaded', source:'main', data };
+    return data;
+  });
+  dataWrites = result.catch(() => {});
+  return result;
+});
+ipcMain.handle('data:open-directory', async () => (await shell.openPath(path.dirname(dataFile))) === '');
 
 async function latestRelease() {
   const response = await fetch('https://api.github.com/repos/wuzenghui27-wq/campus-flow/releases/latest', { headers:{ Accept:'application/vnd.github+json', 'User-Agent':'招迹' } });
@@ -146,6 +163,12 @@ function createWindow() {
     return { action:'deny' };
   });
   win.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file:')) event.preventDefault(); });
+  let closing = false;
+  win.on('close', event => {
+    if (closing) return;
+    event.preventDefault();
+    Promise.all([dataWrites, flushWrites()]).finally(() => { closing = true; win.close(); });
+  });
   win.loadFile(path.join(__dirname, '../dist/index.html'));
 }
 
@@ -154,7 +177,7 @@ ipcMain.on('window:toggle-maximize', event => { const win = BrowserWindow.fromWe
 ipcMain.on('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close());
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
-  await migrateStore(legacyDataFile, dataFile).catch(() => {});
+  storeState = await loadStore(dataFile, [legacyDataFile]);
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, ({ url }, callback) => {
     const host = new URL(url).hostname;
     callback({ cancel:!(host === 'github.com' || host.endsWith('.github.com') || host.endsWith('.githubusercontent.com')) });

@@ -88,26 +88,35 @@ function TitleBar() {
   return <div className="title-bar"><span className="title-dot"/><span>招迹</span><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
 }
 
+function LoadError({ retry, open }:{ retry:()=>void; open:()=>void }) {
+  return <div className="desktop-window"><TitleBar/><div className="window-body"><main><div className="page-content"><section className="pixel-card resume-panel"><div className="empty-icon"><FolderOpen/></div><h2>本地记录读取失败</h2><p>原文件没有被修改。请重试，或打开数据目录检查文件权限。</p><div className="resume-actions"><PixelButton onClick={retry}><RefreshCw size={16}/>重新读取</PixelButton><PixelButton secondary onClick={open}><FolderOpen size={16}/>打开数据目录</PixelButton></div></section></div></main></div></div>;
+}
+
 export default function App() {
+  const initial=window.campus?.initialData??{status:'empty' as const,source:'none' as const,data:null};
   const [page,setPage]=useState<Page>('工作台');
-  const [apps,setAppsState]=useState(()=>parseApplications(localStorage.getItem('campus-flow-applications')));
-  const [profile,setProfileState]=useState(()=>parseProfile(localStorage.getItem('campus-flow-profile')));
-  const [resume,setResumeState]=useState<ResumeRecord|null>(()=>parseObject(localStorage.getItem('campus-flow-resume'),null as unknown as ResumeRecord));
+  const [loadState,setLoadState]=useState(initial);
+  const [apps,setAppsState]=useState(()=>parseApplications(JSON.stringify(initial.data?.applications??[])));
+  const [profile,setProfileState]=useState(()=>parseProfile(JSON.stringify(initial.data?.profile??null)));
+  const [resume,setResumeState]=useState<ResumeRecord|null>(()=>parseObject(JSON.stringify(initial.data?.resume??null),null as unknown as ResumeRecord));
   const [editing,setEditing]=useState<Application|null|undefined>();
   const [updateVersion,setUpdateVersion]=useState('');
   const [updating,setUpdating]=useState(false);
   const [restoring,setRestoring]=useState(false);
-  const restoreData=async(notify=true)=>{ if(!window.campus)return; setRestoring(true); try { const data=notify?await window.campus.recoverData():await window.campus.loadData(); if(!data){await window.campus.saveData({applications:apps,profile,resume}); if(notify)alert('本机还没有可恢复的记录。'); return} const restoredApps=parseApplications(JSON.stringify(data.applications??[])); setAppsState(restoredApps); localStorage.setItem('campus-flow-applications',JSON.stringify(restoredApps)); if(data.profile){const restoredProfile=parseProfile(JSON.stringify(data.profile)); setProfileState(restoredProfile); localStorage.setItem('campus-flow-profile',JSON.stringify(restoredProfile))} if(data.resume){const restoredResume=parseObject(JSON.stringify(data.resume),null as unknown as ResumeRecord); setResumeState(restoredResume); localStorage.setItem('campus-flow-resume',JSON.stringify(restoredResume))} if(notify)alert(`已恢复 ${restoredApps.length} 条本地投递记录。`) } catch { if(notify)alert('读取本地记录失败，请关闭应用后重试。') } finally { setRestoring(false) } };
-  useEffect(()=>{ void restoreData(false) },[]);
+  const applyData=(data:NonNullable<typeof initial.data>)=>{ setAppsState(parseApplications(JSON.stringify(data.applications??[]))); setProfileState(parseProfile(JSON.stringify(data.profile??null))); setResumeState(parseObject(JSON.stringify(data.resume??null),null as unknown as ResumeRecord)) };
+  const restoreData=async()=>{ if(!window.campus)return; setRestoring(true); try { const result=await window.campus.recoverData(); setLoadState(result); if(result.status==='loaded'&&result.data){applyData(result.data);alert(`已恢复 ${result.data.applications?.length??0} 条本地投递记录。`)}else if(result.status==='empty')alert('本机还没有可恢复的记录。') } catch { alert('读取本地记录失败，请关闭应用后重试。') } finally { setRestoring(false) } };
+  const retryLoad=async()=>{ if(!window.campus)return; const result=await window.campus.retryLoadData(); setLoadState(result); if(result.data)applyData(result.data) };
+  const persist=(patch:Parameters<NonNullable<typeof window.campus>['saveData']>[0])=>{ window.campus?.saveData(patch).catch(()=>alert('保存失败，原文件没有被修改。')) };
   useEffect(()=>{ window.campus?.checkUpdate().then(info=>{if(info.available)setUpdateVersion(info.version)}) },[]);
-  const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); localStorage.setItem('campus-flow-applications',JSON.stringify(sorted)); window.campus?.saveData({applications:sorted}) };
-  const setProfile=(next:Profile)=>{ setProfileState(next); localStorage.setItem('campus-flow-profile',JSON.stringify(next)); window.campus?.saveData({profile:next}) };
-  const setResume=(next:ResumeRecord)=>{ setResumeState(next); localStorage.setItem('campus-flow-resume',JSON.stringify(next)); window.campus?.saveData({resume:next}) };
+  const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); persist({applications:sorted}) };
+  const setProfile=(next:Profile)=>{ setProfileState(next); persist({profile:next}) };
+  const setResume=(next:ResumeRecord)=>{ setResumeState(next); persist({resume:next}) };
   const save=(app:Application)=>{ setApps(apps.some(item=>item.id===app.id)?apps.map(item=>item.id===app.id?app:item):[app,...apps]); setEditing(undefined) };
   const remove=(id:string)=>{ if(confirm('确定删除这条投递记录吗？'))setApps(apps.filter(app=>app.id!==id)) };
   const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
   const importProfile=(fields:Partial<Profile>)=>{ setProfile({...profile,...fields}); setPage('个人信息') };
   const installUpdate=async()=>{ setUpdating(true); if(!await window.campus?.installUpdate()){setUpdating(false);alert('更新失败，请稍后重试。')} };
+  if(loadState.status==='error')return <LoadError retry={()=>void retryLoad()} open={()=>void window.campus?.openDataDirectory()}/>;
   const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
-  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><button className="restore-button" onClick={()=>restoreData()} disabled={restoring}><RefreshCw/><span>{restoring?'正在恢复':'恢复本地记录'}</span></button>{updateVersion&&<button className="update-button" onClick={installUpdate} disabled={updating}><Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}<div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
+  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><button className="restore-button" onClick={()=>void restoreData()} disabled={restoring}><RefreshCw/><span>{restoring?'正在恢复':'恢复本地记录'}</span></button>{updateVersion&&<button className="update-button" onClick={installUpdate} disabled={updating}><Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}<div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
 }

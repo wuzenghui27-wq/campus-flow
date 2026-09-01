@@ -1,9 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('campus', {
-  loadData: () => ipcRenderer.invoke('data:load'),
+  initialData: ipcRenderer.sendSync('data:initial'),
+  retryLoadData: () => ipcRenderer.invoke('data:retry'),
   recoverData: () => ipcRenderer.invoke('data:recover'),
   saveData: (patch) => ipcRenderer.invoke('data:save', patch),
+  openDataDirectory: () => ipcRenderer.invoke('data:open-directory'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   pickResume: () => ipcRenderer.invoke('resume:pick'),

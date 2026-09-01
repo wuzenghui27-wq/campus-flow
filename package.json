@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs",
     "desktop": "electron .",
-    "dist:win": "npm run test && npm run build && electron-builder --win portable --x64"
+    "dist:win": "npm run test && npm run build && electron-builder --win nsis --x64"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.8",
@@ -49,19 +49,13 @@
       "package.json"
     ],
     "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
+      "target": "nsis",
       "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "artifactName": "campus-flow-setup-${version}.exe"
-    },
-    "portable": {
-      "artifactName": "campus-flow-${version}-portable.exe"
     },
     "publish": [
       {

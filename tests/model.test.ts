@@ -15,6 +15,7 @@ test('统计投递并安全恢复损坏数据', () => {
   assert.deepEqual(parseApplications(null), []);
   assert.deepEqual(parseApplications('{broken'), []);
   assert.deepEqual(parseApplications(JSON.stringify(apps)), apps);
+  assert.equal(parseApplications(JSON.stringify([...apps,{ company:'损坏记录' }])).length, 2);
   assert.equal(parseApplications(JSON.stringify([{...apps[0],status:'Offer'}]))[0].status, '录用');
   assert.equal(normalizeWebsite('jobs.example.com'), 'https://jobs.example.com/');
   assert.equal(normalizeWebsite('javascript:alert(1)'), '');

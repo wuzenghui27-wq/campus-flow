@@ -29,7 +29,7 @@ export function parseApplications(raw: string | null): Application[] {
     const value = JSON.parse(raw ?? '[]');
     if (!Array.isArray(value)) return [];
     const migrated = value.map(app => ({ ...app, website:normalizeWebsite(app?.website), status:app?.status === 'Offer' ? '录用' : app?.status }));
-    return migrated.every(app => app && typeof app.id === 'string' && typeof app.company === 'string' && statuses.includes(app.status)) ? migrated : [];
+    return migrated.filter(app => app && typeof app.id === 'string' && typeof app.company === 'string' && statuses.includes(app.status));
   } catch { return []; }
 }
 
