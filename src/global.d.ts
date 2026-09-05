@@ -1,7 +1,4 @@
-import type { Application, Profile, ResumeRecord } from './model';
-
-type LocalData = { applications?:Application[]; profile?:Profile; resume?:ResumeRecord|null };
-type LoadState = { status:'loaded'|'empty'|'error'; source:'main'|'backup'|'legacy'|'recovery'|'none'; data:LocalData|null };
+import type { LoadState, LocalData, ResumeRecord } from './model';
 
 declare global {
   interface Window {

@@ -8,9 +8,11 @@ const path = require('node:path');
 const { flushWrites, loadStore, recoverStore, writeStore } = require('./store.cjs');
 const { isNewerVersion } = require('./update.cjs');
 
-const appDataRoot = process.env.APPDATA || app.getPath('appData');
 app.setName('招迹');
-app.setPath('userData', path.join(appDataRoot, '招迹'));
+const roamingDirectory = app.getPath('appData');
+const userDataDirectory = 'E:\\code学习\\招迹数据';
+app.setPath('userData', userDataDirectory);
+app.setPath('sessionData', path.join(userDataDirectory, '会话'));
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
 
@@ -21,16 +23,19 @@ app.on('second-instance', () => {
   win?.focus();
 });
 
-const dataFile = path.join(appDataRoot, '招迹', 'data.json');
-const legacyDataFile = path.join(appDataRoot, '校招迹', 'data.json');
+const dataFile = path.join(userDataDirectory, 'data.json');
+const previousDataFile = path.join(roamingDirectory, '招迹', 'data.json');
+const legacyDataFile = path.join(roamingDirectory, '校招迹', 'data.json');
 let storeState = { status:'error', source:'none', data:null };
 let dataWrites = Promise.resolve();
-ipcMain.on('data:initial', event => { event.returnValue = storeState; });
-ipcMain.handle('data:retry', async () => { await dataWrites; return storeState = await loadStore(dataFile, [legacyDataFile]); });
+const describeState = state => ({ ...state, file:dataFile });
+ipcMain.on('data:initial', event => { event.returnValue = describeState(storeState); });
+ipcMain.handle('data:retry', async () => { await dataWrites; storeState = await loadStore(dataFile, [previousDataFile, legacyDataFile]); return describeState(storeState); });
 ipcMain.handle('data:recover', async () => {
   await dataWrites;
-  const data = await recoverStore(dataFile, [legacyDataFile]);
-  return storeState = data ? { status:'loaded', source:'recovery', data } : await loadStore(dataFile, [legacyDataFile]);
+  const data = await recoverStore(dataFile, [previousDataFile, legacyDataFile]);
+  storeState = data ? { status:'loaded', source:'recovery', data } : await loadStore(dataFile, [previousDataFile, legacyDataFile]);
+  return describeState(storeState);
 });
 ipcMain.handle('data:save', async (_event, patch) => {
   const result = dataWrites.then(async () => {
@@ -177,7 +182,7 @@ ipcMain.on('window:toggle-maximize', event => { const win = BrowserWindow.fromWe
 ipcMain.on('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close());
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
-  storeState = await loadStore(dataFile, [legacyDataFile]);
+  storeState = await loadStore(dataFile, [previousDataFile, legacyDataFile]);
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, ({ url }, callback) => {
     const host = new URL(url).hostname;
     callback({ cancel:!(host === 'github.com' || host.endsWith('.github.com') || host.endsWith('.githubusercontent.com')) });

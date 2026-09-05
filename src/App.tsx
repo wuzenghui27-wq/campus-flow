@@ -3,7 +3,7 @@ import {
   Pencil, Plus, RefreshCw, Sparkles, Trash2, UserRound, X,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
-import { Application, extractProfile, normalizeWebsite, parseApplications, parseObject, parseProfile, Profile, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
+import { Application, extractProfile, normalizeWebsite, parseApplications, parseObject, parseProfile, Profile, resolveInitialState, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
 
 type Page = '工作台' | '投递记录' | '数据统计' | '简历' | '个人信息' | '已投递公司统计';
 const nav: [Page, typeof LayoutDashboard][] = [
@@ -38,7 +38,7 @@ function Empty({ title, copy, onAdd, icon=<BriefcaseBusiness/> }:{ title:string;
 function Workbench({ apps }:{ apps:Application[] }) {
   const counts=useMemo(()=>summarize(apps),[apps]);
   const cards=[
-    ['总投递',apps.length,'还没有记录，去投递记录里添加第一条。','orange'],
+    ['总投递',apps.length,apps.length?'已记录的投递会持续保存在本机。':'还没有记录，去投递记录里添加第一条。','orange'],
     ['进行中',counts.笔试+counts.面试,'笔试、面试阶段的投递会汇总在这里。','teal'],
     ['录用',counts.录用,'获得录用后会自动统计到这一项。','yellow'],
   ];
@@ -88,12 +88,13 @@ function TitleBar() {
   return <div className="title-bar"><span className="title-dot"/><span>招迹</span><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
 }
 
-function LoadError({ retry, open }:{ retry:()=>void; open:()=>void }) {
-  return <div className="desktop-window"><TitleBar/><div className="window-body"><main><div className="page-content"><section className="pixel-card resume-panel"><div className="empty-icon"><FolderOpen/></div><h2>本地记录读取失败</h2><p>原文件没有被修改。请重试，或打开数据目录检查文件权限。</p><div className="resume-actions"><PixelButton onClick={retry}><RefreshCw size={16}/>重新读取</PixelButton><PixelButton secondary onClick={open}><FolderOpen size={16}/>打开数据目录</PixelButton></div></section></div></main></div></div>;
+function LoadError({ retry, open, file, bridgeReady }:{ retry:()=>void; open:()=>void; file:string; bridgeReady:boolean }) {
+  return <div className="desktop-window"><TitleBar/><div className="window-body"><main><div className="page-content"><section className="pixel-card resume-panel"><div className="empty-icon"><FolderOpen/></div><h2>本地记录读取失败</h2><p>{bridgeReady?'原文件没有被修改。请重试，或打开数据目录检查文件权限。':'应用内部接口没有启动，请完全关闭招迹后从正确的桌面快捷方式重新打开。'}</p><p className="file-path">数据文件：{file||'未能取得数据文件路径'}</p><div className="resume-actions"><PixelButton onClick={retry} disabled={!bridgeReady}><RefreshCw size={16}/>重新读取</PixelButton><PixelButton secondary onClick={open} disabled={!bridgeReady}><FolderOpen size={16}/>打开数据目录</PixelButton></div></section></div></main></div></div>;
 }
 
 export default function App() {
-  const initial=window.campus?.initialData??{status:'empty' as const,source:'none' as const,data:null};
+  const bridgeReady=Boolean(window.campus);
+  const initial=resolveInitialState(window.campus?.initialData);
   const [page,setPage]=useState<Page>('工作台');
   const [loadState,setLoadState]=useState(initial);
   const [apps,setAppsState]=useState(()=>parseApplications(JSON.stringify(initial.data?.applications??[])));
@@ -104,8 +105,8 @@ export default function App() {
   const [updating,setUpdating]=useState(false);
   const [restoring,setRestoring]=useState(false);
   const applyData=(data:NonNullable<typeof initial.data>)=>{ setAppsState(parseApplications(JSON.stringify(data.applications??[]))); setProfileState(parseProfile(JSON.stringify(data.profile??null))); setResumeState(parseObject(JSON.stringify(data.resume??null),null as unknown as ResumeRecord)) };
-  const restoreData=async()=>{ if(!window.campus)return; setRestoring(true); try { const result=await window.campus.recoverData(); setLoadState(result); if(result.status==='loaded'&&result.data){applyData(result.data);alert(`已恢复 ${result.data.applications?.length??0} 条本地投递记录。`)}else if(result.status==='empty')alert('本机还没有可恢复的记录。') } catch { alert('读取本地记录失败，请关闭应用后重试。') } finally { setRestoring(false) } };
-  const retryLoad=async()=>{ if(!window.campus)return; const result=await window.campus.retryLoadData(); setLoadState(result); if(result.data)applyData(result.data) };
+  const restoreData=async()=>{ if(!window.campus)return; setRestoring(true); try { const result=resolveInitialState(await window.campus.recoverData()); setLoadState(result); if(result.status==='loaded'&&result.data){applyData(result.data);alert(`已恢复 ${result.data.applications?.length??0} 条本地投递记录。`)}else if(result.status==='empty')alert('本机还没有可恢复的记录。') } catch { alert('读取本地记录失败，请关闭应用后重试。') } finally { setRestoring(false) } };
+  const retryLoad=async()=>{ if(!window.campus)return; const result=resolveInitialState(await window.campus.retryLoadData()); setLoadState(result); if(result.data)applyData(result.data) };
   const persist=(patch:Parameters<NonNullable<typeof window.campus>['saveData']>[0])=>{ window.campus?.saveData(patch).catch(()=>alert('保存失败，原文件没有被修改。')) };
   useEffect(()=>{ window.campus?.checkUpdate().then(info=>{if(info.available)setUpdateVersion(info.version)}) },[]);
   const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); persist({applications:sorted}) };
@@ -116,7 +117,7 @@ export default function App() {
   const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
   const importProfile=(fields:Partial<Profile>)=>{ setProfile({...profile,...fields}); setPage('个人信息') };
   const installUpdate=async()=>{ setUpdating(true); if(!await window.campus?.installUpdate()){setUpdating(false);alert('更新失败，请稍后重试。')} };
-  if(loadState.status==='error')return <LoadError retry={()=>void retryLoad()} open={()=>void window.campus?.openDataDirectory()}/>;
+  if(loadState.status==='error')return <LoadError retry={()=>void retryLoad()} open={()=>void window.campus?.openDataDirectory()} file={loadState.file} bridgeReady={bridgeReady}/>;
   const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
   return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><button className="restore-button" onClick={()=>void restoreData()} disabled={restoring}><RefreshCw/><span>{restoring?'正在恢复':'恢复本地记录'}</span></button>{updateVersion&&<button className="update-button" onClick={installUpdate} disabled={updating}><Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}<div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
 }

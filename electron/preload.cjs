@@ -1,7 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const unavailableState = { status:'error', source:'none', data:null, file:'' };
+function readInitialData() {
+  try {
+    const state = ipcRenderer.sendSync('data:initial');
+    return state && typeof state === 'object' && ['loaded','empty','error'].includes(state.status) ? state : unavailableState;
+  } catch { return unavailableState; }
+}
+
 contextBridge.exposeInMainWorld('campus', {
-  initialData: ipcRenderer.sendSync('data:initial'),
+  initialData: readInitialData(),
   retryLoadData: () => ipcRenderer.invoke('data:retry'),
   recoverData: () => ipcRenderer.invoke('data:recover'),
   saveData: (patch) => ipcRenderer.invoke('data:save', patch),

@@ -1,9 +1,21 @@
-export const statuses = ['已投递', '笔试', '面试', '录用'] as const;
+export const statuses = ['已投递', '笔试', '面试', '录用', '未通过'] as const;
 export type Status = typeof statuses[number];
 export type Application = { id:string; company:string; role:string; location:string; website:string; appliedAt:string; status:Status };
 export type Profile = { name:string; phone:string; email:string; gender:string; birthDate:string; education:string; work:string; internship:string; projects:string; activities:string; awards:string; skills:string; languages:string };
 export type ResumeRecord = { name:string; path:string; updatedAt:string };
+export type LocalData = { applications?:Application[]; profile?:Profile; resume?:ResumeRecord|null };
+export type LoadState = { status:'loaded'|'empty'|'error'; source:'main'|'backup'|'legacy'|'recovery'|'none'; data:LocalData|null; file:string };
 export const emptyProfile: Profile = { name:'', phone:'', email:'', gender:'', birthDate:'', education:'', work:'', internship:'', projects:'', activities:'', awards:'', skills:'', languages:'' };
+
+export function resolveInitialState(raw: unknown): LoadState {
+  const unavailable: LoadState = { status:'error', source:'none', data:null, file:'' };
+  if (!raw || typeof raw !== 'object') return unavailable;
+  const state = raw as Partial<LoadState>;
+  if (state.status !== 'loaded' && state.status !== 'empty' && state.status !== 'error') return unavailable;
+  if (state.status === 'loaded' && (!state.data || typeof state.data !== 'object')) return unavailable;
+  const sources: LoadState['source'][] = ['main','backup','legacy','recovery','none'];
+  return { status:state.status, source:sources.includes(state.source as LoadState['source']) ? state.source as LoadState['source'] : 'none', data:state.data ?? null, file:typeof state.file === 'string' ? state.file : '' };
+}
 
 export function normalizeWebsite(raw: unknown) {
   if (typeof raw !== 'string' || !raw.trim()) return '';
