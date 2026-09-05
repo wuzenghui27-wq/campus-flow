@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs",
+    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs tests/resume.test.cjs",
     "desktop": "electron .",
     "dist:win": "npm run test && npm run build && electron-builder --win nsis --x64"
   },

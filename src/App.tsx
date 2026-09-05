@@ -2,7 +2,9 @@ import {
   BarChart3, BriefcaseBusiness, Building2, Download, ExternalLink, FileText, FolderOpen, LayoutDashboard, LockKeyhole,
   Pencil, Plus, RefreshCw, Sparkles, Trash2, UserRound, X,
 } from 'lucide-react';
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState, useRef } from 'react';
+import ResumeImport from './ResumeImport';
+import type { ResumeExtraction } from './model';
 import { Application, extractProfile, normalizeWebsite, parseApplications, parseObject, parseProfile, Profile, resolveInitialState, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
 
 type Page = '工作台' | '投递记录' | '数据统计' | '简历' | '个人信息' | '已投递公司统计';
@@ -59,12 +61,15 @@ function Statistics({ apps }:{ apps:Application[] }) {
   return <><PageHeader eyebrow="投递洞察" title="数据统计" subtitle="用最少的数字看清当前求职进度。"/><section className="statistics"><article className="pixel-card flow-card"><h2>流程分布</h2>{statuses.map(status=><div className="flow-row" key={status}><span>{status}</span><div className="flow-track"><i style={{width:`${apps.length?Math.max(2,counts[status]/apps.length*100):2}%`}}/></div><strong>{counts[status]}</strong></div>)}</article><article className="pixel-card rate-card"><span>推进率</span><strong>{rate}%</strong><p>进入笔试及后续阶段的投递占比</p></article></section></>;
 }
 
-function ResumeView({ resume, setResume, importProfile }:{ resume:ResumeRecord|null; setResume:(resume:ResumeRecord)=>void; importProfile:(profile:Partial<Profile>)=>void }) {
+function ResumeView({ resume, setResume, importProfile, profile }:{ resume:ResumeRecord|null; setResume:(resume:ResumeRecord)=>void; importProfile:(profile:Profile)=>Promise<void>; profile:Profile }) {
   const [extracting,setExtracting]=useState(false);
-  const extract=async(path=resume?.path)=>{ if(!path||!window.campus)return; setExtracting(true); const text=await window.campus.extractResume(path); setExtracting(false); if(!text)return alert('无法识别这份简历，请确认扫描清晰，或在 Windows 设置中安装中文识别语言包。'); const fields=extractProfile(text); if(!Object.keys(fields).length)return alert('没有识别到个人信息，请手动填写。'); importProfile(fields) };
-  const pick=async()=>{ const selected=await window.campus?.pickResume(); if(selected){setResume(selected); await extract(selected.path)} };
+  const [preview,setPreview]=useState<ResumeExtraction|null>(null);
+  const request=useRef(0);
+  useEffect(()=>()=>{request.current++;},[]);
+  const extract=async(path=resume?.path,id=++request.current)=>{ if(!path||!window.campus)return; setPreview(null);setExtracting(true);try{const result=await window.campus.extractResume(path);if(id!==request.current)return;if(!result)throw new Error();setPreview(result);}catch{if(id===request.current)alert('简历识别失败，请检查文件或本机 OCR 语言组件后重试。');}finally{if(id===request.current)setExtracting(false);} };
+  const pick=async()=>{const id=++request.current;setExtracting(false);setPreview(null);try{const selected=await window.campus?.pickResume();if(selected&&id===request.current){setResume(selected);await extract(selected.path,id);}}catch{if(id===request.current)alert('选择简历失败，请重试。');}};
   const open=async()=>{ if(resume&&window.campus&&!(await window.campus.openResume(resume.path)))alert('无法打开该文件，请重新选择。') };
-  return <><PageHeader eyebrow="求职材料" title="简历" subtitle="简历文件只在本机读取，不会上传。" action={<PixelButton onClick={pick} disabled={extracting}><Plus size={16}/>{extracting?'正在识别':resume?'替换简历':'选择简历'}</PixelButton>}/><section className="pixel-card resume-panel">{resume?<><div className="empty-icon"><FileText/></div><h2>{resume.name}</h2><p className="file-path">{resume.path}</p><small>选择时间：{new Date(resume.updatedAt).toLocaleString('zh-CN')}</small><div className="resume-actions"><PixelButton onClick={()=>extract()} disabled={extracting}><Sparkles size={16}/>{extracting?'正在提取':'重新提取资料'}</PixelButton><PixelButton secondary onClick={open}><FolderOpen size={16}/>打开简历</PixelButton></div><p className="hint">选择或替换简历后，基础资料会自动同步，请核对识别结果。</p></>:<Empty title="还没有简历" copy="选择一份简历，基础资料会自动同步。" icon={<FileText/>}/>}</section></>;
+  return <><PageHeader eyebrow="求职材料" title="简历" subtitle="简历文件只在本机读取，不会上传。" action={<PixelButton onClick={pick}><Plus size={16}/>{resume?'替换简历':'选择简历'}</PixelButton>}/><section className="pixel-card resume-panel">{resume?<><div className="empty-icon"><FileText/></div><h2>{resume.name}</h2><p className="file-path">{resume.path}</p><small>选择时间：{new Date(resume.updatedAt).toLocaleString('zh-CN')}</small><div className="resume-actions"><PixelButton onClick={()=>extract()} disabled={extracting}><Sparkles size={16}/>{extracting?'正在提取':'重新提取资料'}</PixelButton><PixelButton secondary onClick={open}><FolderOpen size={16}/>打开简历</PixelButton></div><p className="hint">提取后预览、编辑并勾选字段，确认导入后才更新个人资料。</p></>:<Empty title="还没有简历" copy="选择一份简历，预览识别结果后导入资料。" icon={<FileText/>}/>}</section>{preview&&<ResumeImport result={preview} current={profile} save={importProfile} cancel={()=>setPreview(null)}/>}</>;
 }
 
 function ProfileView({ profile, setProfile }:{ profile:Profile; setProfile:(profile:Profile)=>void }) {
@@ -115,9 +120,9 @@ export default function App() {
   const save=(app:Application)=>{ setApps(apps.some(item=>item.id===app.id)?apps.map(item=>item.id===app.id?app:item):[app,...apps]); setEditing(undefined) };
   const remove=(id:string)=>{ if(confirm('确定删除这条投递记录吗？'))setApps(apps.filter(app=>app.id!==id)) };
   const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
-  const importProfile=(fields:Partial<Profile>)=>{ setProfile({...profile,...fields}); setPage('个人信息') };
+  const importProfile=async(next:Profile)=>{if(!window.campus)throw new Error('接口不可用');const saved=await window.campus.saveData({profile:next});setProfileState(parseProfile(JSON.stringify(saved.profile)));};
   const installUpdate=async()=>{ setUpdating(true); if(!await window.campus?.installUpdate()){setUpdating(false);alert('更新失败，请稍后重试。')} };
   if(loadState.status==='error')return <LoadError retry={()=>void retryLoad()} open={()=>void window.campus?.openDataDirectory()} file={loadState.file} bridgeReady={bridgeReady}/>;
-  const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
+  const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile} profile={profile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
   return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><button className="restore-button" onClick={()=>void restoreData()} disabled={restoring}><RefreshCw/><span>{restoring?'正在恢复':'恢复本地记录'}</span></button>{updateVersion&&<button className="update-button" onClick={installUpdate} disabled={updating}><Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}<div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
 }

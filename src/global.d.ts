@@ -1,4 +1,4 @@
-import type { LoadState, LocalData, ResumeRecord } from './model';
+import type { LoadState, LocalData, ResumeRecord, ResumeExtraction } from './model';
 
 declare global {
   interface Window {
@@ -12,7 +12,7 @@ declare global {
       installUpdate(): Promise<boolean>;
       pickResume(): Promise<ResumeRecord | null>;
       openResume(path: string): Promise<boolean>;
-      extractResume(path: string): Promise<string | null>;
+      extractResume(path: string): Promise<ResumeExtraction | null>;
       minimizeWindow(): void;
       toggleMaximizeWindow(): void;
       closeWindow(): void;

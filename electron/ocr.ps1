@@ -23,4 +23,7 @@ $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
 if ($null -eq $engine) { throw 'Windows OCR language pack is unavailable' }
 $result = Wait-WinRT ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
-[Console]::Write($result.Text)
+$words = @(foreach ($line in $result.Lines) { foreach ($word in $line.Words) {
+  [pscustomobject]@{ text=$word.Text; x=$word.BoundingRect.X; y=$word.BoundingRect.Y; width=$word.BoundingRect.Width; height=$word.BoundingRect.Height }
+} })
+[Console]::Write((@{ words=$words; width=$bitmap.PixelWidth } | ConvertTo-Json -Depth 5 -Compress))

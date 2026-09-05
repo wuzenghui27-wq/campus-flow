@@ -7,6 +7,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { flushWrites, loadStore, recoverStore, writeStore } = require('./store.cjs');
 const { isNewerVersion } = require('./update.cjs');
+const { extractPages } = require('./resume-layout.cjs');
 
 app.setName('招迹');
 const roamingDirectory = app.getPath('appData');
@@ -98,7 +99,7 @@ async function recognizeImage(filePath) {
   return new Promise((resolve, reject) => execFile('powershell.exe', [
     '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', filePath,
   ], { encoding:'utf8', windowsHide:true, maxBuffer:4 * 1024 * 1024 }, (error, stdout) => {
-    if (error) reject(error); else resolve(stdout.replace(/([\u3400-\u9fff\d])\s+(?=[\u3400-\u9fff\d])/g, '$1').replace(/\s*([@.])\s*/g, '$1'));
+    if (error) reject(error); else { try { resolve(JSON.parse(stdout.replace(/^\uFEFF/,''))); } catch (parseError) { reject(parseError); } }
   }));
 }
 
@@ -125,30 +126,18 @@ ipcMain.handle('resume:extract', async (_event, requestedPath) => {
     if (!(await fs.stat(filePath)).isFile()) return null;
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const document = await getDocument({ data: new Uint8Array(await fs.readFile(filePath)), useSystemFonts: true }).promise;
-    const pages = [];
-    for (let number = 1; number <= document.numPages; number += 1) {
-      const content = await (await document.getPage(number)).getTextContent();
-      pages.push(content.items.map(item => 'str' in item ? item.str : '').join('\n'));
-    }
-    const embeddedText = pages.join('\n');
-    if (embeddedText.replace(/\s/g, '').length >= 20) {
-      await document.cleanup();
-      return embeddedText;
-    }
-    const recognized = [];
-    for (let number = 1; number <= Math.min(document.numPages, 4); number += 1) {
-      const page = await document.getPage(number);
+    try { return await extractPages(document, async page => {
       const viewport = page.getViewport({ scale: 2 });
       const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const imagePath = path.join(app.getPath('temp'), `campus-flow-ocr-${randomUUID()}.png`);
+      const temporaryDirectory = path.join(userDataDirectory, '识别临时文件');
+      await fs.mkdir(temporaryDirectory,{recursive:true});
+      const imagePath = path.join(temporaryDirectory, `resume-${randomUUID()}.png`);
       try {
         await fs.writeFile(imagePath, canvas.toBuffer('image/png'));
-        recognized.push(await recognizeImage(imagePath));
+        return await recognizeImage(imagePath);
       } finally { await fs.unlink(imagePath).catch(() => {}); }
-    }
-    await document.cleanup();
-    return recognized.join('\n');
+    }); } finally { await document.destroy(); }
   } catch { return null; }
 });
 
