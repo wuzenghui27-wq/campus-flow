@@ -10,7 +10,8 @@ const { isNewerVersion } = require('./update.cjs');
 
 app.setName('招迹');
 const roamingDirectory = app.getPath('appData');
-const userDataDirectory = 'E:\\code学习\\招迹数据';
+const applicationDirectory = app.isPackaged ? path.dirname(app.getPath('exe')) : app.getAppPath();
+const userDataDirectory = path.resolve(applicationDirectory, '..', '招迹数据');
 app.setPath('userData', userDataDirectory);
 app.setPath('sessionData', path.join(userDataDirectory, '会话'));
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
