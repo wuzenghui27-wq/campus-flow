@@ -126,9 +126,10 @@ export default function App() {
   const attempt=(fn:()=>void)=>{try{fn();}catch(error){alert((error as Error).message);}};
   if(fatal || !view || !visible || !controller) {
     return <div className="desktop-window"><TitleBar/><main className="page-content">
-      <AccountPanel/>
+      {page==='工作台'&&<AccountPanel/>}
       <h2>{fatal?'账号副本未能打开':'正在读取当前账号…'}</h2>
       <p>{fatal||'不会将上个账号的数据带入当前工作区。'}</p>
+      {page!=='工作台'&&<PixelButton onClick={()=>setPage('工作台')}>返回工作台</PixelButton>}
       {fatal&&<PixelButton onClick={()=>void window.campus?.openDataDirectory()}>打开数据目录</PixelButton>}
     </main></div>;
   }
@@ -159,8 +160,10 @@ export default function App() {
         <strong>{uid?'账号工作区':'本地工作区'}</strong>
         <span>PDF 和文件路径只在本机</span></div></div>
     </aside><main><div className="page-content" key={uid??'guest'}>
-      <AccountPanel pendingCount={view.state.outbox.length}/>
-      <SyncPanel controller={controller}/>
+      {page==='工作台'&&<>
+        <AccountPanel pendingCount={view.state.outbox.length}/>
+        <SyncPanel controller={controller}/>
+      </>}
       {content}
     </div></main></div>
     {editing&&editing.uid===uid&&<ApplicationModal key={editing.app?.id??'new'}
