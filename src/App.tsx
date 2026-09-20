@@ -154,11 +154,13 @@ export default function App() {
         onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav>
       <button className="restore-button" onClick={()=>void window.campus?.openDataDirectory()}>
         <FolderOpen/><span>打开数据目录</span></button>
+      <a className="update-button" href="https://github.com/wuzenghui27-wq/campus-flow/releases/latest" target="_blank" rel="noreferrer">
+        <Download/><span>版本更新</span></a>
       {updateVersion&&<button className="update-button" onClick={()=>void installUpdate()} disabled={updating}>
         <Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}
       <div className="local-box"><LockKeyhole/><div>
         <strong>{uid?'账号工作区':'本地工作区'}</strong>
-        <span>PDF 和文件路径只在本机</span></div></div>
+        <span>PDF和文件路径只在本机</span></div></div>
     </aside><main><div className="page-content" key={uid??'guest'}>
       {page==='工作台'&&<>
         <AccountPanel pendingCount={view.state.outbox.length}/>

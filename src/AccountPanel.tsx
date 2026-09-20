@@ -184,7 +184,7 @@ export default function AccountPanel({pendingCount = 0}: {pendingCount?: number}
       </div>
 
       <p className="account-panel__warning">
-        登录后仅同步投递记录与个人资料文字。PDF 文件和本机路径不上传；同步进度以下方状态为准。
+        登录后仅同步投递记录与个人资料文字。PDF文件和本机路径不上传；同步进度以下方状态为准。
       </p>
 
       {ready && !user && (
