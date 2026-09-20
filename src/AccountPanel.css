@@ -1,0 +1,111 @@
+/* Keep account UI scoped to avoid changing the existing application styles.
+   限定账号组件样式，避免改变原有页面。 */
+.account-panel {
+  margin-bottom: 28px;
+  padding: 18px;
+  border: 3px solid var(--ink, #16241f);
+  background: var(--card, #f7f4e6);
+  color: var(--ink, #16241f);
+  box-shadow: 4px 4px 0 var(--ink, #16241f);
+}
+
+.account-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.account-panel__identity {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.account-panel__identity strong { font-size: 15px; }
+.account-panel__identity span { font-size: 13px; }
+
+.account-panel__warning {
+  margin: 14px 0 0;
+  padding-left: 10px;
+  border-left: 4px solid var(--orange, #ff7a45);
+  color: var(--muted, #4a564f);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.account-panel__details { margin-top: 14px; }
+.account-panel__details summary { cursor: pointer; font-weight: 700; }
+
+.account-panel__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.account-panel__modes button {
+  padding: 7px 10px;
+  border: 2px solid var(--ink, #16241f);
+  background: var(--cream, #f5efe0);
+  color: inherit;
+  cursor: pointer;
+}
+
+.account-panel__modes button[aria-pressed="true"] {
+  background: var(--teal-light, #dcece5);
+  box-shadow: 2px 2px 0 var(--ink, #16241f);
+  font-weight: 700;
+}
+
+.account-panel__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.account-panel__fields label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-panel__fields input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid var(--ink, #16241f);
+  border-radius: 0;
+  background: var(--cream, #f5efe0);
+  color: inherit;
+}
+
+.account-panel input:focus-visible,
+.account-panel button:focus-visible,
+.account-panel summary:focus-visible {
+  outline: 3px solid var(--teal, #3f8f76);
+  outline-offset: 3px;
+}
+
+.account-panel button:disabled,
+.account-panel input:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.account-panel__error,
+.account-panel__notice {
+  margin: 14px 0 0;
+  padding: 10px;
+  border: 2px solid currentColor;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.account-panel__error { color: #8a241b; }
+.account-panel__notice { color: #24513f; }

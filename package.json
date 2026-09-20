@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -9,13 +9,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs tests/resume.test.cjs",
+    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs tests/resume.test.cjs && npm run test:sync",
     "desktop": "electron .",
-    "dist:win": "npm run test && npm run build && electron-builder --win nsis --x64"
+    "dist:win": "npm run test && npm run build && electron-builder --win nsis --x64",
+    "test:sync": "node --experimental-strip-types --test tests/sync-core.test.mjs tests/sync-store.test.cjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.8",
     "electron-updater": "^6.8.9",
+    "firebase": "^12.19.0",
     "lucide-react": "^0.468.0",
     "pdfjs-dist": "^6.3.289",
     "react": "^19.2.0",

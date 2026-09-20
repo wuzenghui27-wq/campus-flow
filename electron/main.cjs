@@ -1,3 +1,4 @@
+const {registerSyncStore}=require('./sync-store.cjs');
 const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { createCanvas } = require('@napi-rs/canvas');
@@ -5,7 +6,7 @@ const { execFile, spawn } = require('node:child_process');
 const { createHash, randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { flushWrites, loadStore, recoverStore, writeStore } = require('./store.cjs');
+const { loadStore } = require('./store.cjs');
 const { isNewerVersion } = require('./update.cjs');
 const { extractPages } = require('./resume-layout.cjs');
 
@@ -29,26 +30,6 @@ const dataFile = path.join(userDataDirectory, 'data.json');
 const previousDataFile = path.join(roamingDirectory, '招迹', 'data.json');
 const legacyDataFile = path.join(roamingDirectory, '校招迹', 'data.json');
 let storeState = { status:'error', source:'none', data:null };
-let dataWrites = Promise.resolve();
-const describeState = state => ({ ...state, file:dataFile });
-ipcMain.on('data:initial', event => { event.returnValue = describeState(storeState); });
-ipcMain.handle('data:retry', async () => { await dataWrites; storeState = await loadStore(dataFile, [previousDataFile, legacyDataFile]); return describeState(storeState); });
-ipcMain.handle('data:recover', async () => {
-  await dataWrites;
-  const data = await recoverStore(dataFile, [previousDataFile, legacyDataFile]);
-  storeState = data ? { status:'loaded', source:'recovery', data } : await loadStore(dataFile, [previousDataFile, legacyDataFile]);
-  return describeState(storeState);
-});
-ipcMain.handle('data:save', async (_event, patch) => {
-  const result = dataWrites.then(async () => {
-    if (storeState.status === 'error') throw new Error('Local data is unavailable');
-    const data = await writeStore(dataFile, patch, storeState.data ?? {});
-    storeState = { status:'loaded', source:'main', data };
-    return data;
-  });
-  dataWrites = result.catch(() => {});
-  return result;
-});
 ipcMain.handle('data:open-directory', async () => (await shell.openPath(path.dirname(dataFile))) === '');
 
 async function latestRelease() {
@@ -158,12 +139,6 @@ function createWindow() {
     return { action:'deny' };
   });
   win.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file:')) event.preventDefault(); });
-  let closing = false;
-  win.on('close', event => {
-    if (closing) return;
-    event.preventDefault();
-    Promise.all([dataWrites, flushWrites()]).finally(() => { closing = true; win.close(); });
-  });
   win.loadFile(path.join(__dirname, '../dist/index.html'));
 }
 
@@ -172,11 +147,28 @@ ipcMain.on('window:toggle-maximize', event => { const win = BrowserWindow.fromWe
 ipcMain.on('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close());
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
+  registerSyncStore({ipcMain,directory:userDataDirectory,readLegacy:()=>storeState});
+
   storeState = await loadStore(dataFile, [previousDataFile, legacyDataFile]);
-  session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, ({ url }, callback) => {
-    const host = new URL(url).hostname;
-    callback({ cancel:!(host === 'github.com' || host.endsWith('.github.com') || host.endsWith('.githubusercontent.com')) });
-  });
+    session.defaultSession.webRequest.onBeforeRequest(
+    { urls: ['http://*/*', 'https://*/*'] },
+    ({ url }, callback) => {
+      const target = new URL(url);
+      const host = target.hostname;
+
+      const isGitHub = host === 'github.com'
+        || host.endsWith('.github.com')
+        || host.endsWith('.githubusercontent.com');
+
+      const isFirebase = target.protocol === 'https:' && [
+        'identitytoolkit.googleapis.com',
+        'securetoken.googleapis.com',
+        'firestore.googleapis.com',
+      ].includes(host);
+
+      callback({ cancel: !(isGitHub || isFirebase) });
+    },
+  );
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

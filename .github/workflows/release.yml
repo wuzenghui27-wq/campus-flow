@@ -1,6 +1,7 @@
 name: 发布应用
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -21,6 +22,10 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx electron-builder --win nsis --publish never
-      - run: gh release create "${{ github.ref_name }}" release/*.exe release/*.blockmap release/latest.yml --title "招迹 ${{ github.ref_name }}" --generate-notes
+      - name: 发布安装包
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          gh release create "v$version" release/*.exe release/*.blockmap release/latest.yml --target "$env:GITHUB_SHA" --title "招迹 v$version" --notes-file RELEASE_NOTES.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

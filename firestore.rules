@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function envelope(d) {
+      return d.keys().hasAll(['kind','value','deleted','revision','mutationId','updatedAt'])
+        && d.keys().hasOnly(['kind','value','deleted','revision','mutationId','updatedAt'])
+        && d.deleted is bool && d.revision is int && d.revision >= 1
+        && d.mutationId is string && d.mutationId.size() > 0 && d.mutationId.size() <= 128
+        && d.updatedAt is timestamp && d.updatedAt == request.time;
+    }
+    function application(key,d) {
+      return d.kind == 'application'
+        && key.matches('a_[A-Za-z0-9_-]{1,120}')
+        && ((d.deleted == true && d.value == null)
+          || (d.deleted == false && d.value is map
+            && d.value.keys().hasAll(['id','company','role','location','website','appliedAt','status'])
+            && d.value.keys().hasOnly(['id','company','role','location','website','appliedAt','status'])
+            && d.value.id is string && key == 'a_' + d.value.id
+            && d.value.company is string && d.value.company.size() > 0 && d.value.company.size() <= 500
+            && d.value.role is string && d.value.role.size() > 0 && d.value.role.size() <= 500
+            && d.value.location is string && d.value.location.size() <= 500
+            && d.value.website is string && d.value.website.size() <= 2048
+            && d.value.appliedAt is string && d.value.appliedAt.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && d.value.status in ['已投递','笔试','面试','录用','未通过']));
+    }
+    function profile(key,d) {
+      return d.kind == 'profile' && d.deleted == false
+        && key in ['p_name','p_phone','p_email','p_gender','p_birthDate','p_education',
+          'p_work','p_internship','p_projects','p_activities','p_awards','p_skills','p_languages']
+        && d.value is string && d.value.size() <= 20000;
+    }
+    match /users/{uid}/entries/{entryId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && envelope(request.resource.data)
+        && request.resource.data.revision == 1
+        && (application(entryId,request.resource.data) || profile(entryId,request.resource.data));
+      allow update: if owner(uid) && envelope(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && (application(entryId,request.resource.data) || profile(entryId,request.resource.data));
+      // Keep deletion markers so an offline device cannot silently restore a deleted record.
+      // 软件通过 deleted=true 同步删除；禁止客户端物理删文档。
+      allow delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

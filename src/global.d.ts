@@ -1,12 +1,8 @@
-import type { LoadState, LocalData, ResumeRecord, ResumeExtraction } from './model';
+import type { ResumeRecord, ResumeExtraction } from './model';
 
 declare global {
   interface Window {
     campus?: {
-      initialData: LoadState;
-      retryLoadData(): Promise<LoadState>;
-      recoverData(): Promise<LoadState>;
-      saveData(patch: LocalData): Promise<LocalData>;
       openDataDirectory(): Promise<boolean>;
       checkUpdate(): Promise<{ available:boolean; version:string }>;
       installUpdate(): Promise<boolean>;

@@ -39,3 +39,7 @@ next-env.d.ts
 /outputs/
 /work/
 /旧版备份/
+
+# Local integration package and source backups
+.cloud-step-backups/
+campus-flow-cloud-step/

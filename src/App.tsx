@@ -1,3 +1,7 @@
+import SyncPanel from './SyncPanel';
+import {useWorkspace} from './useWorkspace';
+import {dataView} from './sync-core';
+import {auth} from './firebase';
 import {
   BarChart3, BriefcaseBusiness, Building2, Download, ExternalLink, FileText, FolderOpen, LayoutDashboard, LockKeyhole,
   Pencil, Plus, RefreshCw, Sparkles, Trash2, UserRound, X,
@@ -5,7 +9,8 @@ import {
 import { FormEvent, ReactNode, useEffect, useMemo, useState, useRef } from 'react';
 import ResumeImport from './ResumeImport';
 import type { ResumeExtraction } from './model';
-import { Application, extractProfile, normalizeWebsite, parseApplications, parseObject, parseProfile, Profile, resolveInitialState, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
+import AccountPanel from './AccountPanel';
+import { Application, normalizeWebsite, Profile, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
 
 type Page = '工作台' | '投递记录' | '数据统计' | '简历' | '个人信息' | '已投递公司统计';
 const nav: [Page, typeof LayoutDashboard][] = [
@@ -84,45 +89,80 @@ function Companies({ apps }:{ apps:Application[] }) {
   return <><PageHeader eyebrow="公司去向" title="已投递公司统计" subtitle={`共投递 ${companies.length} 家公司、${apps.length} 个岗位。`}/>{companies.length?<section className="info-cards">{companies.map(item=><article className="pixel-card info-card" key={item.company}><span className="badge orange">{item.count} 个岗位</span><h2>{item.company}</h2><div className="company-positions">{item.positions.map((position,index)=><div className="company-position" key={`${position.role}-${index}`}><b>职位 {index+1}</b><span>{position.role}</span><small>{position.location} · {position.status}</small></div>)}</div><small>{statuses.filter(status=>item.statuses[status]).map(status=>`${status} ${item.statuses[status]}`).join('　')}</small>{item.website?<a className="company-link" href={item.website} target="_blank" rel="noreferrer"><ExternalLink/>访问招聘网站</a>:<small>未填写招聘网站，请编辑投递记录补充。</small>}</article>)}</section>:<section className="pixel-card"><Empty title="还没有已投递公司" copy="新增投递记录后，这里会自动按公司汇总。"/></section>}</>;
 }
 
-function ApplicationModal({ app, close, save }:{ app:Application|null; close:()=>void; save:(app:Application)=>void }) {
-  const submit=(event:FormEvent<HTMLFormElement>)=>{ event.preventDefault(); const data=new FormData(event.currentTarget); save({id:app?.id||crypto.randomUUID(),company:String(data.get('company')).trim(),role:String(data.get('role')).trim(),location:String(data.get('location')).trim(),website:normalizeWebsite(data.get('website')),appliedAt:String(data.get('appliedAt')),status:data.get('status') as Status}) };
-  return <div className="modal-backdrop" onMouseDown={close}><form className="pixel-card modal" onSubmit={submit} onMouseDown={event=>event.stopPropagation()}><div className="modal-head"><div><div className="eyebrow">{app?.id?'编辑记录':'新增记录'}</div><h2>{app?.id?'更新投递':app?'为该公司新增职位':'记录一次投递'}</h2></div><button type="button" onClick={close} aria-label="关闭"><X/></button></div><label>公司<input name="company" defaultValue={app?.company} required autoFocus={!app}/></label><label>职位<input name="role" defaultValue={app?.role} required autoFocus={Boolean(app&&!app.id)}/></label><label>招聘网站<input name="website" defaultValue={app?.website} placeholder="例如：jobs.example.com"/></label><div className="form-row"><label>城市<input name="location" defaultValue={app?.location} required/></label><label>投递日期<input name="appliedAt" type="date" defaultValue={app?.appliedAt??new Date().toISOString().slice(0,10)} required/></label></div><label>当前状态<select name="status" defaultValue={app?.status??'已投递'}>{statuses.map(status=><option key={status}>{status}</option>)}</select></label><PixelButton type="submit">{app&&!app.id?'另存投递':'保存投递'}</PixelButton></form></div>;
+function ApplicationModal({ app, close, save }:{ app:Application|null; close:()=>void; save:(app:Application)=>Promise<void> }) {
+  const [saving,setSaving]=useState(false);
+  const [error,setError]=useState('');
+  const submitting=useRef(false);
+  const submit=async(event:FormEvent<HTMLFormElement>)=>{ event.preventDefault(); if(submitting.current)return; const data=new FormData(event.currentTarget); submitting.current=true;setSaving(true);setError(''); try { await save({id:app?.id||crypto.randomUUID(),company:String(data.get('company')).trim(),role:String(data.get('role')).trim(),location:String(data.get('location')).trim(),website:normalizeWebsite(data.get('website')),appliedAt:String(data.get('appliedAt')),status:data.get('status') as Status}); } catch { setError('保存失败，填写内容已保留，请重试。'); } finally { submitting.current=false;setSaving(false); } };
+  return <div className="modal-backdrop"><form className="pixel-card modal" onSubmit={submit}><div className="modal-head"><div><div className="eyebrow">{app?.id?'编辑记录':'新增记录'}</div><h2>{app?.id?'更新投递':app?'为该公司新增职位':'记录一次投递'}</h2></div><button type="button" disabled={saving} onClick={close} aria-label="关闭"><X/></button></div><label>公司<input disabled={saving} name="company" defaultValue={app?.company} required autoFocus={!app}/></label><label>职位<input disabled={saving} name="role" defaultValue={app?.role} required autoFocus={Boolean(app&&!app.id)}/></label><label>招聘网站<input disabled={saving} name="website" defaultValue={app?.website} placeholder="例如：jobs.example.com"/></label><div className="form-row"><label>城市<input disabled={saving} name="location" defaultValue={app?.location} required/></label><label>投递日期<input disabled={saving} name="appliedAt" type="date" defaultValue={app?.appliedAt??new Date().toISOString().slice(0,10)} required/></label></div><label>当前状态<select disabled={saving} name="status" defaultValue={app?.status??'已投递'}>{statuses.map(status=><option key={status}>{status}</option>)}</select></label><PixelButton type="submit" disabled={saving}>{saving?'正在保存…':app&&!app.id?'另存投递':'保存投递'}</PixelButton>{error&&<p role="alert">{error}</p>}</form></div>;
 }
 
 function TitleBar() {
   return <div className="title-bar"><span className="title-dot"/><span>招迹</span><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
 }
 
-function LoadError({ retry, open, file, bridgeReady }:{ retry:()=>void; open:()=>void; file:string; bridgeReady:boolean }) {
-  return <div className="desktop-window"><TitleBar/><div className="window-body"><main><div className="page-content"><section className="pixel-card resume-panel"><div className="empty-icon"><FolderOpen/></div><h2>本地记录读取失败</h2><p>{bridgeReady?'原文件没有被修改。请重试，或打开数据目录检查文件权限。':'应用内部接口没有启动，请完全关闭招迹后从正确的桌面快捷方式重新打开。'}</p><p className="file-path">数据文件：{file||'未能取得数据文件路径'}</p><div className="resume-actions"><PixelButton onClick={retry} disabled={!bridgeReady}><RefreshCw size={16}/>重新读取</PixelButton><PixelButton secondary onClick={open} disabled={!bridgeReady}><FolderOpen size={16}/>打开数据目录</PixelButton></div></section></div></main></div></div>;
-}
-
+// CAMPUS_FLOW_CLOUD_STEP_1 — generated workspace integration.
 export default function App() {
-  const bridgeReady=Boolean(window.campus);
-  const initial=resolveInitialState(window.campus?.initialData);
+  const {view,controller,fatal}=useWorkspace();
   const [page,setPage]=useState<Page>('工作台');
-  const [loadState,setLoadState]=useState(initial);
-  const [apps,setAppsState]=useState(()=>parseApplications(JSON.stringify(initial.data?.applications??[])));
-  const [profile,setProfileState]=useState(()=>parseProfile(JSON.stringify(initial.data?.profile??null)));
-  const [resume,setResumeState]=useState<ResumeRecord|null>(()=>parseObject(JSON.stringify(initial.data?.resume??null),null as unknown as ResumeRecord));
-  const [editing,setEditing]=useState<Application|null|undefined>();
   const [updateVersion,setUpdateVersion]=useState('');
   const [updating,setUpdating]=useState(false);
-  const [restoring,setRestoring]=useState(false);
-  const applyData=(data:NonNullable<typeof initial.data>)=>{ setAppsState(parseApplications(JSON.stringify(data.applications??[]))); setProfileState(parseProfile(JSON.stringify(data.profile??null))); setResumeState(parseObject(JSON.stringify(data.resume??null),null as unknown as ResumeRecord)) };
-  const restoreData=async()=>{ if(!window.campus)return; setRestoring(true); try { const result=resolveInitialState(await window.campus.recoverData()); setLoadState(result); if(result.status==='loaded'&&result.data){applyData(result.data);alert(`已恢复 ${result.data.applications?.length??0} 条本地投递记录。`)}else if(result.status==='empty')alert('本机还没有可恢复的记录。') } catch { alert('读取本地记录失败，请关闭应用后重试。') } finally { setRestoring(false) } };
-  const retryLoad=async()=>{ if(!window.campus)return; const result=resolveInitialState(await window.campus.retryLoadData()); setLoadState(result); if(result.data)applyData(result.data) };
-  const persist=(patch:Parameters<NonNullable<typeof window.campus>['saveData']>[0])=>{ window.campus?.saveData(patch).catch(()=>alert('保存失败，原文件没有被修改。')) };
-  useEffect(()=>{ window.campus?.checkUpdate().then(info=>{if(info.available)setUpdateVersion(info.version)}) },[]);
-  const setApps=(next:Application[])=>{ const sorted=[...next].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt)); setAppsState(sorted); persist({applications:sorted}) };
-  const setProfile=(next:Profile)=>{ setProfileState(next); persist({profile:next}) };
-  const setResume=(next:ResumeRecord)=>{ setResumeState(next); persist({resume:next}) };
-  const save=(app:Application)=>{ setApps(apps.some(item=>item.id===app.id)?apps.map(item=>item.id===app.id?app:item):[app,...apps]); setEditing(undefined) };
-  const remove=(id:string)=>{ if(confirm('确定删除这条投递记录吗？'))setApps(apps.filter(app=>app.id!==id)) };
-  const update=(id:string,status:Status)=>setApps(apps.map(app=>app.id===id?{...app,status}:app));
-  const importProfile=async(next:Profile)=>{if(!window.campus)throw new Error('接口不可用');const saved=await window.campus.saveData({profile:next});setProfileState(parseProfile(JSON.stringify(saved.profile)));};
-  const installUpdate=async()=>{ setUpdating(true); if(!await window.campus?.installUpdate()){setUpdating(false);alert('更新失败，请稍后重试。')} };
-  if(loadState.status==='error')return <LoadError retry={()=>void retryLoad()} open={()=>void window.campus?.openDataDirectory()} file={loadState.file} bridgeReady={bridgeReady}/>;
-  const content=page==='工作台'?<Workbench apps={apps}/>:page==='投递记录'?<Records apps={apps} add={()=>setEditing(null)} edit={setEditing} update={update} remove={remove}/>:page==='数据统计'?<Statistics apps={apps}/>:page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile} profile={profile}/>:page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:<Companies apps={apps}/>;
-  return <div className="desktop-window"><TitleBar/><div className="window-body"><aside className="sidebar"><div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div><nav>{nav.map(([label,Icon])=><button className={page===label?'active':''} onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav><button className="restore-button" onClick={()=>void restoreData()} disabled={restoring}><RefreshCw/><span>{restoring?'正在恢复':'恢复本地记录'}</span></button>{updateVersion&&<button className="update-button" onClick={installUpdate} disabled={updating}><Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}<div className="local-box"><LockKeyhole/><div><strong>本地模式</strong><span>没有云端同步</span></div></div></aside><main><div className="page-content">{content}</div></main></div>{editing!==undefined&&<ApplicationModal key={editing?.id??'new'} app={editing} close={()=>setEditing(undefined)} save={save}/>}</div>;
+  useEffect(()=>{
+    let mounted=true;
+    window.campus?.checkUpdate().then(info=>{
+      if(mounted&&info.available)setUpdateVersion(info.version);
+    }).catch(()=>{});
+    return ()=>{mounted=false;};
+  },[]);
+  const installUpdate=async()=>{
+    setUpdating(true);
+    try{if(!await window.campus?.installUpdate())throw new Error('更新失败，请稍后重试。');}
+    catch(error){setUpdating(false);alert((error as Error).message);}
+  };
+  const [editing,setEditing]=useState<{uid:string|null;app:Application|null;baseRevision?:number}|undefined>();
+  const uid=view?.state.uid;
+  const visible=view && (auth.currentUser?.uid??null)===view.state.uid;
+  const attempt=(fn:()=>void)=>{try{fn();}catch(error){alert((error as Error).message);}};
+  if(fatal || !view || !visible || !controller) {
+    return <div className="desktop-window"><TitleBar/><main className="page-content">
+      <AccountPanel/>
+      <h2>{fatal?'账号副本未能打开':'正在读取当前账号…'}</h2>
+      <p>{fatal||'不会将上个账号的数据带入当前工作区。'}</p>
+      {fatal&&<PixelButton onClick={()=>void window.campus?.openDataDirectory()}>打开数据目录</PixelButton>}
+    </main></div>;
+  }
+  const {applications:apps,profile,resume}=dataView(view.state);
+  const edit=(app:Application|null)=>setEditing({uid:view.state.uid,app,baseRevision:app?.id?controller.jobRevision(app.id):undefined});
+  const save=async(app:Application)=>{controller.saveJob(app,editing?.app?.id===app.id?editing?.baseRevision:undefined);setEditing(undefined);};
+  const remove=(id:string)=>{if(confirm('确定删除这条投递记录吗？登录状态下，该删除也会同步到其他设备。'))attempt(()=>controller.removeJob(id));};
+  const update=(id:string,status:Status)=>attempt(()=>controller.updateStatus(id,status));
+  const setProfile=(next:Profile)=>attempt(()=>controller.saveProfile(next,view.state));
+  const setResume=(next:ResumeRecord)=>attempt(()=>controller.saveResume(next));
+  const importProfile=async(next:Profile)=>{controller.saveProfile(next,view.state);};
+  const content=page==='工作台'?<Workbench apps={apps}/>:
+    page==='投递记录'?<Records apps={apps} add={()=>edit(null)} edit={edit} update={update} remove={remove}/>:
+    page==='数据统计'?<Statistics apps={apps}/>:
+    page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile} profile={profile}/>:
+    page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:
+    <Companies apps={apps}/>;
+  return <div className="desktop-window"><TitleBar/>
+    <div className="window-body"><aside className="sidebar">
+      <div className="brand"><span><FoxLogo/></span><strong>招迹</strong></div>
+      <nav>{nav.map(([label,Icon])=><button className={page===label?'active':''}
+        onClick={()=>setPage(label)} key={label}><Icon/>{label}</button>)}</nav>
+      <button className="restore-button" onClick={()=>void window.campus?.openDataDirectory()}>
+        <FolderOpen/><span>打开数据目录</span></button>
+      {updateVersion&&<button className="update-button" onClick={()=>void installUpdate()} disabled={updating}>
+        <Download/><span>{updating?'正在更新':`更新到 ${updateVersion}`}</span></button>}
+      <div className="local-box"><LockKeyhole/><div>
+        <strong>{uid?'账号工作区':'本地工作区'}</strong>
+        <span>PDF 和文件路径只在本机</span></div></div>
+    </aside><main><div className="page-content" key={uid??'guest'}>
+      <AccountPanel pendingCount={view.state.outbox.length}/>
+      <SyncPanel controller={controller}/>
+      {content}
+    </div></main></div>
+    {editing&&editing.uid===uid&&<ApplicationModal key={editing.app?.id??'new'}
+      app={editing.app} close={()=>setEditing(undefined)} save={save}/>}
+  </div>;
 }
