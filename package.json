@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -9,10 +9,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs tests/resume.test.cjs && npm run test:sync",
+    "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs tests/desktop-platform.test.cjs tests/resume.test.cjs && npm run test:sync",
     "desktop": "electron .",
     "dist:win": "npm run test && npm run build && electron-builder --win nsis --x64",
-    "test:sync": "node --experimental-strip-types --test tests/sync-core.test.mjs tests/sync-store.test.cjs"
+    "test:sync": "node --experimental-strip-types --test tests/sync-core.test.mjs tests/sync-store.test.cjs",
+    "dist:mac": "npm run test && npm run build && electron-builder --mac --arm64 --publish never"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.8",
@@ -66,7 +67,18 @@
         "owner": "wuzenghui27-wq",
         "repo": "campus-flow"
       }
-    ]
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "artifactName": "campus-flow-${version}-mac-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false
+    }
   },
   "allowScripts": {
     "electron@37.10.3": true,

@@ -10,8 +10,17 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+            args: --win nsis --x64
+          - os: macos-latest
+            target: mac
+            args: --mac --arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,11 +30,31 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx electron-builder --win nsis --publish never
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
       - name: 发布安装包
-        shell: pwsh
         run: |
-          $version = node -p "require('./package.json').version"
-          gh release create "v$version" release/*.exe release/*.blockmap release/latest.yml --target "$env:GITHUB_SHA" --title "招迹 v$version" --notes-file RELEASE_NOTES.md
+          version=$(node -p "require('./package.json').version")
+          gh release create "v$version" release/* --target "$GITHUB_SHA" --title "招迹 v$version" --notes-file RELEASE_NOTES.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -13,7 +13,9 @@ const { extractPages } = require('./resume-layout.cjs');
 app.setName('招迹');
 const roamingDirectory = app.getPath('appData');
 const applicationDirectory = app.isPackaged ? path.dirname(app.getPath('exe')) : app.getAppPath();
-const userDataDirectory = path.resolve(applicationDirectory, '..', '招迹数据');
+const userDataDirectory = app.isPackaged && process.platform === 'darwin'
+  ? path.join(roamingDirectory, '招迹')
+  : path.resolve(applicationDirectory, '..', '招迹数据');
 app.setPath('userData', userDataDirectory);
 app.setPath('sessionData', path.join(userDataDirectory, '会话'));
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -48,6 +50,10 @@ ipcMain.handle('update:install', async () => {
   try {
     const release = await latestRelease();
     if (!isNewerVersion(release.version, app.getVersion())) return false;
+    if (process.platform === 'darwin') {
+      await shell.openExternal('https://github.com/wuzenghui27-wq/campus-flow/releases/latest');
+      return true;
+    }
     if (!process.env.PORTABLE_EXECUTABLE_FILE) {
       autoUpdater.autoDownload = false;
       const result = await autoUpdater.checkForUpdates();

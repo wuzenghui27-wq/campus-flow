@@ -117,7 +117,8 @@ export default function App() {
   const installUpdate=async()=>{
     setUpdating(true);
     try{if(!await window.campus?.installUpdate())throw new Error('更新失败，请稍后重试。');}
-    catch(error){setUpdating(false);alert((error as Error).message);}
+    catch(error){alert((error as Error).message);}
+    finally{setUpdating(false);}
   };
   const [editing,setEditing]=useState<{uid:string|null;app:Application|null;baseRevision?:number}|undefined>();
   const uid=view?.state.uid;

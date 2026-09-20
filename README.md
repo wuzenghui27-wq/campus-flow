@@ -1,6 +1,6 @@
 # 招迹
 
-一款本地优先的 Windows 校招投递管理应用。用中文像素风工作台记录投递、跟进进度、整理简历和个人资料，未登录时可使用独立的本机工作区；登录后可同步投递记录和个人资料。
+一款本地优先的 Windows / macOS 校招投递管理应用。用中文像素风工作台记录投递、跟进进度、整理简历和个人资料，未登录时可使用独立的本机工作区；登录后可同步投递记录和个人资料。
 
 [下载安装](https://github.com/wuzenghui27-wq/campus-flow/releases) · [反馈问题](https://github.com/wuzenghui27-wq/campus-flow/issues)
 
@@ -41,9 +41,11 @@
 2. 运行安装包，按提示完成安装。
 3. 从桌面或开始菜单的「招迹」快捷方式打开应用。
 
-支持 Windows x64。下载页以实际发布版本为准，可能与主分支代码不同。当前主分支支持选择安装位置，不再生成便携版。
+支持 Windows x64 和 Apple 芯片 Mac（arm64）。Mac 下载 `campus-flow-版本号-mac-arm64.dmg`，打开后将「招迹.app」拖入「应用程序」。也可下载同名 ZIP 解压得到 app。
 
-> 数据保存在本机的「招迹数据」目录中。请确保数据目录可写，并在升级或更改安装位置前备份数据。
+Mac 版本目前没有 Apple 开发者签名和公证；如系统拦截，请在「系统设置 → 隐私与安全性」检查并允许打开你确认来源的应用。下载页以实际发布版本为准，可能与主分支代码不同。Windows 安装版支持选择安装位置。
+
+> Windows 数据保存在「招迹数据」目录，Mac 安装版保存在 `~/Library/Application Support/招迹/`。升级前请备份数据。
 
 ## 使用方法
 
@@ -59,7 +61,7 @@
 
 在「简历」中选择一份 PDF。应用保存原文件路径，然后展示识别原文、可编辑的字段和现有资料。空白字段默认选中，已有资料和不确定结果默认不覆盖；请核对、编辑并勾选需要的字段，点击「确认导入」后才保存。取消不会修改个人资料，保存失败时预览内容保留，可重试。
 
-文字页和扫描页分别处理，扫描页尝试本机 OCR，可能需要 Windows 中文识别语言组件。每次最多 OCR 四页，未处理或识别失败的页会提示。复杂排版可能仍需手动整理；未经确认的内容不会自动写入资料。
+文字页和扫描页分别处理，扫描页仅在 Windows 上尝试本机 OCR，可能需要 Windows 中文识别语言组件；Mac 支持提取文字 PDF，扫描页需手动填写。每次最多 OCR 四页，未处理或识别失败的页会提示。复杂排版可能仍需手动整理；未经确认的内容不会自动写入资料。
 
 简历原文件移动或删除后，需要重新选择。
 
@@ -75,9 +77,11 @@
 
 ### 更新版本
 
-联网启动后，应用会检查 GitHub Releases。有新版本时，侧栏显示更新按钮，点击后下载并安装。更新检查和云同步需要网络，本地记录管理可离线使用。从 v1.0.14 起支持云同步；另一台电脑也需要安装支持云同步的版本。
+联网启动后，应用会检查 GitHub Releases。有新版本时，侧栏显示更新按钮，Windows 点击后下载并安装；Mac 点击后打开发布页，下载新版并替换应用。更新检查和云同步需要网络，本地记录管理可离线使用。从 v1.0.14 起支持云同步；另一台电脑也需要安装支持云同步的版本。
 
 ## 数据保存
+
+Mac 安装版数据位于 `~/Library/Application Support/招迹/`，独立于 app 保存，替换 app 不会删除资料。开发版仍使用项目旁的「招迹数据」目录；在安装版登录同一账号可取回已同步文字资料，PDF 需重新选择。
 
 - 账号副本及待同步队列：`招迹数据/账号同步副本/<UID的SHA256>.json`，备份为同名 `.json.bak`。
 - 未登录工作区：同目录下的 `guest.json`。
@@ -93,7 +97,7 @@
 
 技术栈：React、TypeScript、Electron、Vite、electron-builder。
 
-需要 Windows x64、Node.js 22 LTS 最新补丁版本和 npm。
+需要 Windows x64 或 Apple 芯片 Mac、Node.js 22 LTS 最新补丁版本和 npm。
 
 ```powershell
 git clone https://github.com/wuzenghui27-wq/campus-flow.git
@@ -108,8 +112,9 @@ npm test          # 原有测试和同步测试
 npx electron scripts/test-application-draft.cjs # 构建后运行表单回归测试，使用隔离数据
 npm run build     # 类型检查和前端构建
 npm run dist:win  # 生成 Windows 安装包
+npm run dist:mac  # 在 Mac 生成 Apple 芯片版 DMG、ZIP 和 app
 ```
 
 Electron 加载 `dist` 中的构建文件，修改前端后需要重新构建。`npm run dev` 仅启动 Vite，不包含桌面接口，不能替代完整应用。
 
-安装包输出到 `release/`。创建并推送与 package.json 版本一致的 `v版本号` 标签，或在 GitHub Actions 手动运行「发布应用」，会自动测试、打包并发布。发布前需更新 `RELEASE_NOTES.md`。
+安装包输出到 `release/`。创建并推送与 package.json 版本一致的 `v版本号` 标签，或在 GitHub Actions 手动运行「发布应用」，会分别在 Windows 和 macOS 自动测试、打包，两端成功后一起发布。发布前需更新 `RELEASE_NOTES.md`。
