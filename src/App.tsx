@@ -3,19 +3,18 @@ import {useWorkspace} from './useWorkspace';
 import {dataView} from './sync-core';
 import {auth} from './firebase';
 import {
-  BarChart3, BriefcaseBusiness, Building2, Download, ExternalLink, FileText, FolderOpen, LayoutDashboard, LockKeyhole,
-  Pencil, Plus, RefreshCw, Sparkles, Trash2, UserRound, X,
+  BarChart3, BriefcaseBusiness, Building2, Download, ExternalLink, FolderOpen, LayoutDashboard, LockKeyhole,
+  Pencil, Plus, RefreshCw, Trash2, UserRound, X,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useEffect, useMemo, useState, useRef } from 'react';
-import ResumeImport from './ResumeImport';
-import type { ResumeExtraction } from './model';
+import ResumeView from './ResumeView';
 import AccountPanel from './AccountPanel';
-import { Application, normalizeWebsite, Profile, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
+import { Application, normalizeWebsite, ResumeRecord, Status, statuses, summarize, summarizeCompanies } from './model';
 
-type Page = '工作台' | '投递记录' | '数据统计' | '简历' | '个人信息' | '已投递公司统计';
+type Page = '工作台' | '投递记录' | '数据统计' | '个人信息' | '已投递公司统计';
 const nav: [Page, typeof LayoutDashboard][] = [
   ['工作台', LayoutDashboard], ['投递记录', BriefcaseBusiness], ['数据统计', BarChart3],
-  ['简历', FileText], ['个人信息', UserRound], ['已投递公司统计', Building2],
+  ['个人信息', UserRound], ['已投递公司统计', Building2],
 ];
 
 const fox = [
@@ -64,24 +63,6 @@ function Statistics({ apps }:{ apps:Application[] }) {
   const counts=summarize(apps);
   const rate=apps.length?Math.round((counts.笔试+counts.面试+counts.录用)/apps.length*100):0;
   return <><PageHeader eyebrow="投递洞察" title="数据统计" subtitle="用最少的数字看清当前求职进度。"/><section className="statistics"><article className="pixel-card flow-card"><h2>流程分布</h2>{statuses.map(status=><div className="flow-row" key={status}><span>{status}</span><div className="flow-track"><i style={{width:`${apps.length?Math.max(2,counts[status]/apps.length*100):2}%`}}/></div><strong>{counts[status]}</strong></div>)}</article><article className="pixel-card rate-card"><span>推进率</span><strong>{rate}%</strong><p>进入笔试及后续阶段的投递占比</p></article></section></>;
-}
-
-function ResumeView({ resume, setResume, importProfile, profile }:{ resume:ResumeRecord|null; setResume:(resume:ResumeRecord)=>void; importProfile:(profile:Profile)=>Promise<void>; profile:Profile }) {
-  const [extracting,setExtracting]=useState(false);
-  const [preview,setPreview]=useState<ResumeExtraction|null>(null);
-  const request=useRef(0);
-  useEffect(()=>()=>{request.current++;},[]);
-  const extract=async(path=resume?.path,id=++request.current)=>{ if(!path||!window.campus)return; setPreview(null);setExtracting(true);try{const result=await window.campus.extractResume(path);if(id!==request.current)return;if(!result)throw new Error();setPreview(result);}catch{if(id===request.current)alert('简历识别失败，请检查文件或本机 OCR 语言组件后重试。');}finally{if(id===request.current)setExtracting(false);} };
-  const pick=async()=>{const id=++request.current;setExtracting(false);setPreview(null);try{const selected=await window.campus?.pickResume();if(selected&&id===request.current){setResume(selected);await extract(selected.path,id);}}catch{if(id===request.current)alert('选择简历失败，请重试。');}};
-  const open=async()=>{ if(resume&&window.campus&&!(await window.campus.openResume(resume.path)))alert('无法打开该文件，请重新选择。') };
-  return <><PageHeader eyebrow="求职材料" title="简历" subtitle="简历文件只在本机读取，不会上传。" action={<PixelButton onClick={pick}><Plus size={16}/>{resume?'替换简历':'选择简历'}</PixelButton>}/><section className="pixel-card resume-panel">{resume?<><div className="empty-icon"><FileText/></div><h2>{resume.name}</h2><p className="file-path">{resume.path}</p><small>选择时间：{new Date(resume.updatedAt).toLocaleString('zh-CN')}</small><div className="resume-actions"><PixelButton onClick={()=>extract()} disabled={extracting}><Sparkles size={16}/>{extracting?'正在提取':'重新提取资料'}</PixelButton><PixelButton secondary onClick={open}><FolderOpen size={16}/>打开简历</PixelButton></div><p className="hint">提取后预览、编辑并勾选字段，确认导入后才更新个人资料。</p></>:<Empty title="还没有简历" copy="选择一份简历，预览识别结果后导入资料。" icon={<FileText/>}/>}</section>{preview&&<ResumeImport result={preview} current={profile} save={importProfile} cancel={()=>setPreview(null)}/>}</>;
-}
-
-function ProfileView({ profile, setProfile }:{ profile:Profile; setProfile:(profile:Profile)=>void }) {
-  const basic:[keyof Profile,string,string][]=[['name','姓名','text'],['phone','手机号','tel'],['email','邮箱','email'],['gender','性别','text'],['birthDate','出生日期','date']];
-  const details:[keyof Profile,string][]=[['education','教育经历'],['work','工作经历'],['internship','实习经历'],['projects','项目经历'],['activities','实践活动'],['awards','奖励荣誉'],['skills','专业技能'],['languages','语言']];
-  const bookmarklet=`javascript:(()=>{const d=${JSON.stringify(profile)};const m={name:['姓名','name'],phone:['手机','电话','phone','mobile'],email:['邮箱','email'],gender:['性别','gender'],birthDate:['出生日期','生日','birth'],education:['教育','学校','院校','education'],work:['工作经历','work'],internship:['实习','internship'],projects:['项目','project'],activities:['实践活动','activity'],awards:['奖励','荣誉','award'],skills:['专业技能','skill'],languages:['语言','language']};document.querySelectorAll('input,textarea,select').forEach(i=>{const s=(i.name+' '+i.placeholder+' '+i.id).toLowerCase();for(const k in m)if(m[k].some(x=>s.includes(x.toLowerCase()))){i.value=d[k]||'';i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));break}})})()`;
-  return <><PageHeader eyebrow="本机资料" title="个人信息" subtitle="输入后立即保存在本机，重开应用仍会保留。"/><section className="profile-scroll"><div className="profile-grid"><form className="pixel-card profile-form" onSubmit={event=>event.preventDefault()}><h2>基础资料</h2>{basic.map(([key,label,type])=><label key={key}>{label}{key==='gender'?<select value={profile[key]} onChange={event=>setProfile({...profile,[key]:event.target.value})}><option value="">请选择</option><option>男</option><option>女</option><option>其他</option></select>:<input type={type} value={profile[key]} onChange={event=>setProfile({...profile,[key]:event.target.value})} placeholder={`请输入${label}`}/>}</label>)}<h2>经历与能力</h2>{details.map(([key,label])=><label className="profile-detail" key={key}>{label}<textarea value={profile[key]} onChange={event=>setProfile({...profile,[key]:event.target.value})} placeholder={`请输入${label}`}/></label>)}</form><aside className="pixel-card autofill"><div className="empty-icon"><Sparkles/></div><h2>招聘网站自动填写</h2><p>把下方按钮拖入浏览器书签栏，在招聘表单页面点击即可尝试填写。</p><a href={bookmarklet} draggable onClick={event=>event.preventDefault()} className="pixel-button">拖动我：自动填写资料</a><PixelButton secondary onClick={()=>navigator.clipboard.writeText(Object.values(profile).filter(Boolean).join('\n'))}>复制全部资料</PixelButton><small><LockKeyhole/>资料变化后，请重新拖入书签栏。</small></aside></div></section></>;
 }
 
 function Companies({ apps }:{ apps:Application[] }) {
@@ -138,14 +119,11 @@ export default function App() {
   const save=async(app:Application)=>{controller.saveJob(app,editing?.app?.id===app.id?editing?.baseRevision:undefined);setEditing(undefined);};
   const remove=(id:string)=>{if(confirm('确定删除这条投递记录吗？登录状态下，该删除也会同步到其他设备。'))attempt(()=>controller.removeJob(id));};
   const update=(id:string,status:Status)=>attempt(()=>controller.updateStatus(id,status));
-  const setProfile=(next:Profile)=>attempt(()=>controller.saveProfile(next,view.state));
-  const setResume=(next:ResumeRecord)=>attempt(()=>controller.saveResume(next));
-  const importProfile=async(next:Profile)=>{controller.saveProfile(next,view.state);};
+  const saveResume=async(next:ResumeRecord)=>{controller.saveResume(next);};
   const content=page==='工作台'?<Workbench apps={apps}/>:
     page==='投递记录'?<Records apps={apps} add={()=>edit(null)} edit={edit} update={update} remove={remove}/>:
     page==='数据统计'?<Statistics apps={apps}/>:
-    page==='简历'?<ResumeView resume={resume} setResume={setResume} importProfile={importProfile} profile={profile}/>:
-    page==='个人信息'?<ProfileView profile={profile} setProfile={setProfile}/>:
+    page==='个人信息'?null:
     <Companies apps={apps}/>;
   return <div className="desktop-window"><TitleBar/>
     <div className="window-body"><aside className="sidebar">
@@ -161,12 +139,13 @@ export default function App() {
       <div className="local-box"><LockKeyhole/><div>
         <strong>{uid?'账号工作区':'本地工作区'}</strong>
         <span>PDF和文件路径只在本机</span></div></div>
-    </aside><main><div className="page-content" key={uid??'guest'}>
+    </aside><main className={page==='个人信息'?'resume-page':undefined}><div className="page-content" key={uid??'guest'}>
       {page==='工作台'&&<>
         <AccountPanel pendingCount={view.state.outbox.length}/>
         <SyncPanel controller={controller}/>
       </>}
       {content}
+      <div className="resume-container" hidden={page!=='个人信息'}><ResumeView resume={resume} profile={profile} save={saveResume}/></div>
     </div></main></div>
     {editing&&editing.uid===uid&&<ApplicationModal key={editing.app?.id??'new'}
       app={editing.app} close={()=>setEditing(undefined)} save={save}/>}

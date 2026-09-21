@@ -2,8 +2,8 @@ export const statuses = ['已投递', '笔试', '面试', '录用', '未通过']
 export type Status = typeof statuses[number];
 export type Application = { id:string; company:string; role:string; location:string; website:string; appliedAt:string; status:Status };
 export type Profile = { name:string; phone:string; email:string; gender:string; birthDate:string; education:string; work:string; internship:string; projects:string; activities:string; awards:string; skills:string; languages:string };
-export type ResumeRecord = { name:string; path:string; updatedAt:string };
-export type ResumeExtraction = { text:string; pages:{number:number;method:'text'|'ocr'|'skipped'|'error';text:string}[]; processedPages:number; totalPages:number; warnings:string[] };
+export type ResumeRecord = { name:string; path:string; updatedAt:string; text?:string; originalText?:string; warnings?:string[] };
+export type ResumeExtraction = { text:string; pages:{number:number;method:'text'|'ocr'|'error';text:string}[]; processedPages:number; totalPages:number; warnings:string[] };
 export type LocalData = { applications?:Application[]; profile?:Profile; resume?:ResumeRecord|null };
 export type LoadState = { status:'loaded'|'empty'|'error'; source:'main'|'backup'|'legacy'|'recovery'|'none'; data:LocalData|null; file:string };
 export const emptyProfile: Profile = { name:'', phone:'', email:'', gender:'', birthDate:'', education:'', work:'', internship:'', projects:'', activities:'', awards:'', skills:'', languages:'' };
@@ -54,54 +54,4 @@ export function parseObject<T extends object>(raw: string | null, fallback: T): 
 export function parseProfile(raw: string | null): Profile {
   const value = parseObject(raw, emptyProfile) as Profile & { school?:string; major?:string; degree?:string };
   return { ...value, education:value.education || [value.school,value.major,value.degree].filter(Boolean).join(' · ') };
-}
-
-export function extractProfile(text: string): Partial<Profile> {
-  const clean = text.replace(/\r\n?/g, '\n').replace(/[\t \u00a0]+/g, ' ');
-  const lines = clean.split('\n').map(line => line.trim()).filter(Boolean);
-  const result: Partial<Profile> = {};
-  const email = clean.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0];
-  const phone = clean.match(/(?:\+?86[- ]?)?(1[3-9]\d[- ]?\d{4}[- ]?\d{4})/)?.[1]?.replace(/[- ]/g, '');
-  const named = clean.match(/(?:姓名|Name)\s*[:：]?\s*([\u4e00-\u9fa5·]{2,6})/i)?.[1];
-  const name = named ?? lines.slice(0, 12).find(line => /^[\u4e00-\u9fa5·]{2,4}$/.test(line) && !/简历|求职|教育|经历|技能|项目/.test(line));
-  const school = clean.match(/([\u4e00-\u9fa5]{2,20}(?:大学|学院))/)?.[1];
-  const major = clean.match(/(?:专业|主修)\s*[:：]?\s*([^\n|｜]{2,24})/)?.[1]?.trim();
-  const degree = clean.match(/博士|硕士|研究生|本科|学士|大专|专科/)?.[0];
-  const gender = clean.match(/性别\s*[:：]?\s*(男|女|其他)/)?.[1];
-  const birth = clean.match(/(?:出生日期|出生年月日|生日)\s*[:：]?\s*(\d{4})[年./-](\d{1,2})[月./-](\d{1,2})日?/);
-  const headings = '教育经历|教育背景|工作经历|实习经历|项目经历|实践活动|校园实践|社会实践|奖励荣誉|荣誉奖励|获奖经历|专业技能|技能特长|语言能力|语言水平';
-  const section = (names:string) => {
-    const parts:string[]=[]; let active=false;
-    for(const line of clean.split('\n')) {
-      const heading=line.trim().match(new RegExp(`^(${headings})(?:[ :：]+(.*)|$)`));
-      if(heading) { active=new RegExp(`^(?:${names})$`).test(heading[1]); if(active&&heading[2])parts.push(heading[2]); else if(active&&parts.length)parts.push(''); }
-      else if(active) parts.push(line.trim());
-    }
-    return parts.join('\n').trim() || undefined;
-  };
-  if (name) result.name = name;
-  if (phone) result.phone = phone;
-  if (email) result.email = email;
-  if (gender) result.gender = gender;
-  if (birth) result.birthDate = `${birth[1]}-${birth[2].padStart(2,'0')}-${birth[3].padStart(2,'0')}`;
-  result.education = section('教育经历|教育背景') ?? ([school,major,degree].filter(Boolean).join(' · ') || undefined);
-  result.work = section('工作经历');
-  result.internship = section('实习经历');
-  result.projects = section('项目经历');
-  result.activities = section('实践活动|校园实践|社会实践');
-  result.awards = section('奖励荣誉|荣誉奖励|获奖经历');
-  result.skills = section('专业技能|技能特长');
-  result.languages = section('语言能力|语言水平');
-  for (const key of Object.keys(result) as (keyof Profile)[]) if (!result[key]) delete result[key];
-  return result;
-}
-
-export const profileLabels: Record<keyof Profile,string> = {name:'姓名',phone:'手机号',email:'邮箱',gender:'性别',birthDate:'出生日期',education:'教育经历',work:'工作经历',internship:'实习经历',projects:'项目经历',activities:'实践活动',awards:'奖励荣誉',skills:'专业技能',languages:'语言'};
-export function selectImportFields(current:Profile, fields:Partial<Profile>, text:string, hasWarnings:boolean) {
-  return Object.fromEntries((Object.keys(profileLabels) as (keyof Profile)[]).map(key=>[key, Boolean(fields[key]?.trim()&&!current[key]?.trim()&&!hasWarnings&&(key!=='name'||/(?:姓名|Name)[ :：]/i.test(text))&&(key!=='education'||/教育经历|教育背景/.test(text)))])) as Record<keyof Profile,boolean>;
-}
-export function mergeImport(current:Profile, fields:Partial<Profile>, selected:Partial<Record<keyof Profile,boolean>>):Profile {
-  const next={...current};
-  for(const key of Object.keys(profileLabels) as (keyof Profile)[]) if(selected[key]&&fields[key]?.trim()) next[key]=fields[key]!.trim();
-  return next;
 }

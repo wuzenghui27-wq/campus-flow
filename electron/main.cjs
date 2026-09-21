@@ -1,14 +1,13 @@
 const {registerSyncStore}=require('./sync-store.cjs');
 const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
-const { createCanvas } = require('@napi-rs/canvas');
-const { execFile, spawn } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const { createHash, randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { loadStore } = require('./store.cjs');
 const { isNewerVersion } = require('./update.cjs');
-const { extractPages } = require('./resume-layout.cjs');
+const {readPdf,extractPdf,pdfError} = require('./resume-pdf.cjs');
 
 app.setName('招迹');
 const roamingDirectory = app.getPath('appData');
@@ -79,17 +78,6 @@ ipcMain.handle('update:install', async () => {
   } catch { return false; }
 });
 
-async function recognizeImage(filePath) {
-  const script = app.isPackaged
-    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'ocr.ps1')
-    : path.join(__dirname, 'ocr.ps1');
-  return new Promise((resolve, reject) => execFile('powershell.exe', [
-    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', filePath,
-  ], { encoding:'utf8', windowsHide:true, maxBuffer:4 * 1024 * 1024 }, (error, stdout) => {
-    if (error) reject(error); else { try { resolve(JSON.parse(stdout.replace(/^\uFEFF/,''))); } catch (parseError) { reject(parseError); } }
-  }));
-}
-
 ipcMain.handle('resume:pick', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: '简历文件', extensions: ['pdf'] }] });
   if (result.canceled) return null;
@@ -97,35 +85,20 @@ ipcMain.handle('resume:pick', async () => {
   return { name: path.basename(filePath), path: filePath, updatedAt: new Date().toISOString() };
 });
 
-ipcMain.handle('resume:open', async (_event, requestedPath) => {
-  if (typeof requestedPath !== 'string' || path.extname(requestedPath).toLowerCase() !== '.pdf') return false;
-  const filePath = path.resolve(requestedPath);
-  try {
-    if (!(await fs.stat(filePath)).isFile()) return false;
-    return (await shell.openPath(filePath)) === '';
-  } catch { return false; }
+ipcMain.handle('resume:read', async (_event, filePath) => {
+  try {return {ok:true,data:await readPdf(filePath)};}
+  catch(error) {return {ok:false,error:pdfError(error)};}
 });
 
-ipcMain.handle('resume:extract', async (_event, requestedPath) => {
-  if (typeof requestedPath !== 'string' || path.extname(requestedPath).toLowerCase() !== '.pdf') return null;
+ipcMain.handle('resume:extract', async (_event, filePath) => {
   try {
-    const filePath = path.resolve(requestedPath);
-    if (!(await fs.stat(filePath)).isFile()) return null;
-    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    const document = await getDocument({ data: new Uint8Array(await fs.readFile(filePath)), useSystemFonts: true }).promise;
-    try { return await extractPages(document, async page => {
-      const viewport = page.getViewport({ scale: 2 });
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const temporaryDirectory = path.join(userDataDirectory, '识别临时文件');
-      await fs.mkdir(temporaryDirectory,{recursive:true});
-      const imagePath = path.join(temporaryDirectory, `resume-${randomUUID()}.png`);
-      try {
-        await fs.writeFile(imagePath, canvas.toBuffer('image/png'));
-        return await recognizeImage(imagePath);
-      } finally { await fs.unlink(imagePath).catch(() => {}); }
-    }); } finally { await document.destroy(); }
-  } catch { return null; }
+    const data=await extractPdf(filePath, {
+      macOcr:app.isPackaged ? path.join(process.resourcesPath,'ocr-mac') : path.join(app.getAppPath(),'build','ocr-mac'),
+      windowsOcr:app.isPackaged ? path.join(process.resourcesPath,'app.asar.unpacked','electron','ocr.ps1') : path.join(__dirname,'ocr.ps1'),
+      tempDirectory:path.join(userDataDirectory,'识别临时文件'),
+    });
+    return {ok:true,data};
+  } catch(error) {return {ok:false,error:pdfError(error)};}
 });
 
 function createWindow() {

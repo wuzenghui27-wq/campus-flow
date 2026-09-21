@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractProfile, normalizeWebsite, parseApplications, parseProfile, resolveInitialState, summarize, summarizeCompanies, mergeImport, selectImportFields, emptyProfile, type Application } from '../src/model.ts';
+import { normalizeWebsite, parseApplications, parseProfile, resolveInitialState, summarize, summarizeCompanies, type Application } from '../src/model.ts';
 
 test('统计投递并安全恢复损坏数据', () => {
   const apps: Application[] = [
@@ -26,27 +26,8 @@ test('统计投递并安全恢复损坏数据', () => {
   assert.equal(parseProfile(JSON.stringify({name:'张三',school:'清华大学',major:'计算机',degree:'本科'})).education, '清华大学 · 计算机 · 本科');
 });
 
-test('从中文简历文本提取个人信息', () => {
-  assert.deepEqual(extractProfile(`张三\n手机：138 1234 5678\n邮箱 zhangsan@example.com\n性别：男\n出生日期：2002年3月4日\n教育经历\n清华大学\n专业：计算机科学与技术\n本科\n专业技能\nReact、TypeScript\n语言能力\n英语六级`), {
-    name:'张三', phone:'13812345678', email:'zhangsan@example.com', gender:'男', birthDate:'2002-03-04', education:'清华大学\n专业：计算机科学与技术\n本科', skills:'React、TypeScript', languages:'英语六级',
-  });
-});
-
 test('接口不可用时进入错误状态而不是显示空记录', () => {
   for (const value of [undefined,null,'loaded',{}, { status:'loaded', source:'main', data:null }]) assert.equal(resolveInitialState(value).status, 'error');
   assert.equal(resolveInitialState({ status:'empty', source:'none', data:null }).status, 'empty');
   assert.deepEqual(resolveInitialState({ status:'loaded', source:'main', data:{ applications:[] }, file:'C:\\data.json' }), { status:'loaded', source:'main', data:{ applications:[] }, file:'C:\\data.json' });
-});
-
-test('重复章节和同行标题不串字段，未选和空白不覆盖旧资料',()=>{
-  const text='教育背景：示例大学\n本科\n项目经历：项目甲\n• 编写页面\n专业技能：TypeScript\n项目经历\n项目乙\n2025-2026\n';
-  const fields=extractProfile(text);
-  assert.equal(fields.education,'示例大学\n本科');assert.equal(fields.projects,'项目甲\n• 编写页面\n\n项目乙\n2025-2026');assert.equal(fields.skills,'TypeScript');
-  const current={...emptyProfile,name:'原姓名',projects:'原项目'};
-  const selected=selectImportFields(current,fields,text,false);
-  assert.equal(selected.projects,false);assert.equal(selected.education,true);
-  assert.equal(mergeImport(current,{...fields,name:''},{...selected,name:true}).name,'原姓名');
-  assert.equal(mergeImport(current,fields,selected).projects,'原项目');
-  assert.equal(mergeImport(current,fields,{}).education,'');
-  assert.equal(selectImportFields(current,fields,text,true).education,false);
 });

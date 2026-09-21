@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('campus', {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   pickResume: () => ipcRenderer.invoke('resume:pick'),
-  openResume: (filePath) => ipcRenderer.invoke('resume:open', filePath),
+  readResume: (filePath) => ipcRenderer.invoke('resume:read', filePath),
   extractResume: (filePath) => ipcRenderer.invoke('resume:extract', filePath),
   minimizeWindow: () => ipcRenderer.send('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.send('window:toggle-maximize'),

@@ -1,3 +1,4 @@
+import type {ResumeRecord} from './model';
 /** Pure, locally durable sync state. No network calls or file paths in cloud data.
  * 同步状态与合并逻辑；只允许投递字段和个人资料文字进入云端。
  */
@@ -23,7 +24,7 @@ export type Operation = {
 export type SyncState = {
   format: 1; uid: string | null; remote: Record<string, Entry>;
   outbox: Operation[]; conflicts: Record<string, true>;
-  resume: {name:string; path:string; updatedAt:string} | null;
+  resume: ResumeRecord | null;
   legacyImported: boolean; legacyDismissed: boolean;
   conflictArchive: Array<{at:string; key:string; operations:Operation[];
     remote:Entry|null; choice:'local'|'cloud'}>;

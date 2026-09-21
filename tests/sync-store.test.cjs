@@ -61,3 +61,10 @@ test('UID 中的路径符号只参与哈希，不形成目录穿越',t=>{
   const {storage,dir}=setup(t);const file=storage.fileFor('../../outside');
   assert.equal(path.dirname(file),path.join(dir,'账号同步副本'));
 });
+test('整篇简历与原始提取副本重开后保持一致，账号之间隔离',t=>{
+  const {storage}=setup(t),a=storage.open(1,'A'),data=state('A');
+  data.resume={name:'简历.pdf',path:'/local/简历.pdf',updatedAt:'2026-09-21',text:'编辑后\n\n•  保留空格',originalText:'原始全文\n其他内容',warnings:[]};
+  storage.save(1,a.token,data);storage.close(1);
+  assert.deepEqual(storage.open(2,'A').data.resume,data.resume);
+  assert.equal(storage.open(2,'B').data,null);
+});

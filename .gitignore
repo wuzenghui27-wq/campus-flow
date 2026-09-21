@@ -43,3 +43,5 @@ next-env.d.ts
 # Local integration package and source backups
 .cloud-step-backups/
 campus-flow-cloud-step/
+
+/build/ocr-mac

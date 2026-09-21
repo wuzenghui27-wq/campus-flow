@@ -1,6 +1,6 @@
 {
   "name": "campus-flow",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "private": true,
   "description": "本地优先的校招投递工作台",
   "author": "Campus Flow",
@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/build-resume.cjs",
     "test": "node --test tests/model.test.ts tests/store.test.cjs tests/update.test.cjs tests/desktop-platform.test.cjs tests/resume.test.cjs && npm run test:sync",
     "desktop": "electron .",
     "dist:win": "npm run test && npm run build && electron-builder --win nsis --x64",
@@ -77,7 +77,14 @@
       "category": "public.app-category.productivity",
       "artifactName": "campus-flow-${version}-mac-${arch}.${ext}",
       "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "extraResources": [
+        {
+          "from": "build/ocr-mac",
+          "to": "ocr-mac"
+        }
+      ],
+      "minimumSystemVersion": "12.0"
     }
   },
   "allowScripts": {

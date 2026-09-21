@@ -46,7 +46,7 @@ function layoutText(items, width) {
 }
 
 async function extractPages(document, readOcr) {
-  const pages=[], warnings=[]; let ocrCount=0;
+  const pages=[], warnings=[];
   for(let number=1;number<=document.numPages;number++) {
     try {
       const page=await document.getPage(number), content=await page.getTextContent();
@@ -56,17 +56,14 @@ async function extractPages(document, readOcr) {
         return {text:i.str,x,y,width:i.width,height:Math.abs(i.height)||12};
       });
       let text=layoutText(items,viewport.width), method='text';
-      if(text.replace(/\s/g,'').length<20) {
-        if(ocrCount>=4) { pages.push({number,method:'skipped',text:''}); continue; }
-        ocrCount++; method='ocr'; const result=await readOcr(page);
+      if(!text.trim()) {
+        method='ocr'; const result=await readOcr(page);
         text=layoutText(result.words,result.width);
       }
       pages.push({number,method,text});
       if(!text.trim()) warnings.push(`第 ${number} 页未识别到文字。`);
-    } catch { pages.push({number,method:'error',text:''}); warnings.push(`第 ${number} 页识别失败，请检查 PDF 或本机 OCR 语言组件。`); }
+    } catch (error) { pages.push({number,method:'error',text:''}); warnings.push(`第 ${number} 页读取失败：${error.message || '页面内容无法解析'}`); }
   }
-  const skipped=pages.filter(p=>p.method==='skipped').length;
-  if(skipped) warnings.push(`本次最多识别 4 张扫描页，另有 ${skipped} 页未处理。`);
   if(pages.some(p=>p.method==='ocr')) warnings.push('扫描识别结果需要核对，复杂排版可能存在阅读顺序偏差。');
   return {text:pages.map(p=>p.text).join('\n\n'),pages,processedPages:pages.filter(p=>p.method==='text'||p.method==='ocr').length,totalPages:document.numPages,warnings};
 }
