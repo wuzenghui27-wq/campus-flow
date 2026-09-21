@@ -108,7 +108,7 @@ function createWindow() {
     minWidth: 920,
     minHeight: 640,
     autoHideMenuBar: true,
-    backgroundColor: '#f6f5ef',
+    backgroundColor: '#16241f',
     icon: path.join(__dirname, '../build/icon.png'),
     frame: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },

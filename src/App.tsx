@@ -79,7 +79,7 @@ function ApplicationModal({ app, close, save }:{ app:Application|null; close:()=
 }
 
 function TitleBar() {
-  return <div className="title-bar"><span className="title-dot"/><span>招迹</span><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
+  return <div className="title-bar"><span className="title-dot" aria-hidden="true"/><div className="window-controls"><button title="最小化" onClick={()=>window.campus?.minimizeWindow()}/><button title="最大化" onClick={()=>window.campus?.toggleMaximizeWindow()}/><button title="关闭" onClick={()=>window.campus?.closeWindow()}/></div></div>;
 }
 
 // CAMPUS_FLOW_CLOUD_STEP_1 — generated workspace integration.
