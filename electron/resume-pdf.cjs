@@ -36,8 +36,8 @@ async function extractPdf(filePath, resources) {
   const {getDocument} = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const base = path.dirname(require.resolve('pdfjs-dist/package.json'));
   const task = getDocument({data:await readPdf(filePath),useSystemFonts:true,
-    cMapUrl:path.join(base,'cmaps')+path.sep,cMapPacked:true,
-    standardFontDataUrl:path.join(base,'standard_fonts')+path.sep,wasmUrl:path.join(base,'wasm')+path.sep});
+    cMapUrl:path.join(base,'cmaps')+'/',cMapPacked:true,
+    standardFontDataUrl:path.join(base,'standard_fonts')+'/',wasmUrl:path.join(base,'wasm')+'/'});
   try {
     const document = await task.promise;
     return await extractPages(document,async page=>{
